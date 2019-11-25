@@ -8,7 +8,6 @@ class filesize_worker(base_worker):
         # routing key follows pattern of <file type>.<worker type>
         # worker type is 'filesize' for this worker, and we listen
         # for any possible filetype, so '#'
-        # listen for filesize jobs (regardless of file type)
         super().__init__(host, 'filesize_queue', '#.filesize')
 
     def callback(self, job_request):
