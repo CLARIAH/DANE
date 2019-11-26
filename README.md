@@ -6,7 +6,7 @@ This repository contains utils which improve the ease of working with DANE, for 
 ## Installation
 Install as a import-able pip package. `-e` flag indicates that it is an editable installation, i.e. if you pull a new version or modify the code this is directly usable.
 
-    https://github.com/CLARIAH/DANE-utils.git
+    git clone https://github.com/CLARIAH/DANE-utils.git
     cd DANE-utils/
     pip install -e .
 

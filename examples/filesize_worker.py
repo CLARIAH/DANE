@@ -3,12 +3,15 @@ from os.path import getsize
 import json
 
 class filesize_worker(base_worker):
+    # we specify a queue name because every worker of this type should 
+    # listen to the same queue
+    __queue_name = 'filesize_queue'
 
     def __init__(self, host):
         # routing key follows pattern of <file type>.<worker type>
         # worker type is 'filesize' for this worker, and we listen
         # for any possible filetype, so '#'
-        super().__init__(host, 'filesize_queue', '#.filesize')
+        super().__init__(host, self.__queue_name, '#.filesize')
 
     def callback(self, job_request):
         print('Got request', job_request)
