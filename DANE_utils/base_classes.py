@@ -56,3 +56,26 @@ class base_worker(ABC):
     @abstractmethod
     def callback(self, job_request):
         return
+
+class base_handler(ABC):
+    def __init__(self, config):
+        self.config = config
+
+    @abstractmethod
+    def register_job(self, job):
+        return
+
+    @abstractmethod
+    def register(self, job_id, task):
+        return
+    
+    @abstractmethod
+    def getTaskState(self, task_id):
+        return
+
+    def isDone(self, task_id):
+        return self.getTaskState(task_id) == 200
+
+    @abstractmethod
+    def run(self, task_id):
+        return
