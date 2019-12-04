@@ -27,4 +27,4 @@ class DummyHandler(base_handler):
     def run(self, task_id):
         task, state, job_id = self.task_register[task_id]
         self.task_register[task_id] = (task, 200, job_id)
-        print('DummyEndpoint: Executed task {} for job: {}'.format(task, job_id))
+        print('DummyEndpoint: Executed task {} for job: {}'.format(task.task_key, job_id))

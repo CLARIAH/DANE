@@ -61,7 +61,7 @@ class jobspec():
         elif self.api is None:
             raise MissingEndpointError('No endpoint found to register job')
 
-        self.job_id = self.api.register_job(job="{}:{}".format(self.source_set, self.source_id))
+        self.job_id = self.api.register_job(job=self)
 
         for t in self.tasks:
             t.register(job_id=self.job_id)
@@ -92,7 +92,7 @@ class Task():
         elif self.api is None:
             raise MissingEndpointError('No endpoint found to register task')
 
-        self.task_id = self.api.register(job_id=job_id, task=self.task_key)
+        self.task_id = self.api.register(job_id=job_id, task=self)
 
     def run(self):
         if self.task_id is None:
