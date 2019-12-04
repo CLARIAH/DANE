@@ -18,6 +18,7 @@ class base_worker(ABC):
                 exchange_type='topic')
 
         self.channel.queue_declare(queue=self.queue, 
+                arguments={'x-max-priority': 10},
                 durable=True)
 
         # binding_key can be a single str following the format as explained
@@ -32,7 +33,7 @@ class base_worker(ABC):
                 routing_key=bk)
 
         self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(on_message_callback=self.__callback, 
+        self.channel.basic_consume(on_message_callback=self._callback, 
                                    auto_ack=False,
                                    queue=self.queue)
 
@@ -42,13 +43,14 @@ class base_worker(ABC):
     def stop(self):
         self.channel.stop_consuming()
 
-    def __callback(self, ch, method, props, body):
+    def _callback(self, ch, method, props, body):
         response = self.callback(json.loads(body))
 
         ch.basic_publish(exchange='',
                      routing_key=props.reply_to,
-                     properties=pika.BasicProperties(correlation_id = \
-                                                         props.correlation_id),
+                     properties=pika.BasicProperties(
+                         correlation_id = props.correlation_id,
+                         delivery_mode=2),
                      body=str(response))
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -65,6 +67,12 @@ class base_handler(ABC):
     def register_job(self, job):
         return
 
+    # job objects task list is modified after each task is registered
+    # to include task_ids, propagate this change
+    @abstractmethod
+    def propagate_task_ids(self, job):
+        return
+
     @abstractmethod
     def register(self, job_id, task):
         return
@@ -78,4 +86,8 @@ class base_handler(ABC):
 
     @abstractmethod
     def run(self, task_id):
+        return
+
+    @abstractmethod
+    def callback(self, task_id, response):
         return

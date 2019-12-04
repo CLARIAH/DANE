@@ -66,6 +66,8 @@ class jobspec():
         for t in self.tasks:
             t.register(job_id=self.job_id)
 
+        self.api.propagate_task_id(job=self)
+
     def run(self):
         return self.tasks.run()
 

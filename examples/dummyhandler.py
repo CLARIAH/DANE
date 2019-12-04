@@ -12,6 +12,9 @@ class DummyHandler(base_handler):
         self.job_register[idx] = job
         return idx
 
+    def propagate_task_ids(self, job):
+        self.job_register[job.job_id] = job
+
     def register(self, job_id, task):
         if job_id in self.job_register.keys():
             idx = str(len(self.task_register))
