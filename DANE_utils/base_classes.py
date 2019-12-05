@@ -1,3 +1,4 @@
+from DANE_utils import jobspec
 from abc import ABC, abstractmethod
 import pika
 import json
@@ -49,7 +50,7 @@ class base_worker(ABC):
         self.channel.stop_consuming()
 
     def _callback(self, ch, method, props, body):
-        response = self.callback(json.loads(body))
+        response = self.callback(jobspec.jobspec.from_json(body))
 
         ch.basic_publish(exchange='',
                      routing_key=props.reply_to,
