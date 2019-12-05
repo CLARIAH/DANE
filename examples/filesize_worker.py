@@ -19,7 +19,9 @@ class filesize_worker(base_worker):
         print('Got request', job_request)
         fs = getsize(job_request['file'])
 
-        return json.dumps({'filesize': fs})
+        return json.dumps({'state': 200,
+            'message': 'Success',
+            'filesize': fs})
 
 if __name__ == '__main__':
     fsw = filesize_worker('localhost')
