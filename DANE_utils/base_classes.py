@@ -4,14 +4,19 @@ import json
 
 class base_worker(ABC):
 
-    def __init__(self, host, queue, binding_key):
+    def __init__(self, host, queue, binding_key, exchange='DANE-exchange', 
+            port=5672, user='guest', password='guest'):
         self.host = host
-        self.exchange = 'DANE'
+        self.port = port
+        self.exchange = exchange
         self.queue = queue
         self.binding_key = binding_key
 
+        credentials = pika.PlainCredentials(user, password)
         self.connection = pika.BlockingConnection(
-                    pika.ConnectionParameters(self.host))
+                    pika.ConnectionParameters(
+                        credentials=credentials,
+                        host=self.host, port=self.port))
         self.channel = self.connection.channel()
 
         self.channel.exchange_declare(exchange=self.exchange, 
