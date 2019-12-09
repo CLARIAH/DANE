@@ -1,11 +1,6 @@
 import json
 import sys
-
-class MissingEndpointError(Exception):
-    pass
-
-class APIRegistrationError(Exception):
-    pass
+from DANE_utils import errors as DANError
 
 class jobspec():
     def __init__(self, source_url, source_id, source_set, tasks,
@@ -57,9 +52,9 @@ class jobspec():
 
     def register(self):
         if self.job_id is not None:
-            raise APIRegistrationError('Job already registered')
+            raise DANError.APIRegistrationError('Job already registered')
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to register job')
+            raise DANError.MissingEndpointError('No endpoint found to register job')
 
         self.job_id = self.api.register_job(job=self)
 
@@ -90,25 +85,25 @@ class Task():
 
     def register(self, job_id):
         if self.task_id is not None:
-            raise APIRegistrationError('Task already registered')
+            raise DANError.APIRegistrationError('Task already registered')
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to register task')
+            raise DANError.MissingEndpointError('No endpoint found to register task')
 
         self.task_id = self.api.register(job_id=job_id, task=self)
 
     def run(self):
         if self.task_id is None:
-            raise APIRegistrationError('Cannot run an unregistered task')
+            raise DANError.APIRegistrationError('Cannot run an unregistered task')
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to perform task')
+            raise DANError.MissingEndpointError('No endpoint found to perform task')
 
         return self.api.run(task_id = self.task_id)
 
     def isDone(self):
         if self.task_id is None:
-            raise APIRegistrationError('Cannot check doneness of an unregistered task')
+            raise DANError.APIRegistrationError('Cannot check doneness of an unregistered task')
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to check task doneness against')
+            raise DANError.MissingEndpointError('No endpoint found to check task doneness against')
 
         return self.api.isDone(task_id = self.task_id)
 
