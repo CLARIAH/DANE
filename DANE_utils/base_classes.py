@@ -5,13 +5,18 @@ import json
 
 class base_worker(ABC):
 
-    def __init__(self, host, queue, binding_key, exchange='DANE-exchange', 
-            port=5672, user='guest', password='guest'):
-        self.host = host
-        self.port = port
-        self.exchange = exchange
+    def __init__(self, queue, binding_key, config):
+        
         self.queue = queue
         self.binding_key = binding_key
+
+        self.config = config
+        self.host = config['RABBITMQ']['host']
+        self.port = config['RABBITMQ']['port']
+        self.exchange = config['RABBITMQ']['exchange']
+
+        user = config['RABBITMQ']['user']
+        password = config['RABBITMQ']['password']
 
         credentials = pika.PlainCredentials(user, password)
         self.connection = pika.BlockingConnection(
