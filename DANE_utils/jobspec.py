@@ -56,6 +56,10 @@ class jobspec():
         elif self.api is None:
             raise DANError.MissingEndpointError('No endpoint found to register job')
 
+        if 'SHARED' not in self.response.keys():
+            self.response['SHARED'] = {}
+
+        self.response['SHARED'].update(self.api.get_dirs(job=self))
         self.job_id = self.api.register_job(job=self)
 
         for t in self.tasks:

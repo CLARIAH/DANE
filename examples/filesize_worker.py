@@ -12,7 +12,7 @@ class filesize_worker(base_worker):
         # worker type is 'filesize' for this worker, and we listen
         # for any possible filetype, so '#'
         super().__init__(queue=self.__queue_name, 
-                binding_key='#.filesize', config)
+                binding_key='#.filesize', config=config)
 
     def callback(self, job_request):
         print('Got request', job_request)

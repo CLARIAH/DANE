@@ -84,6 +84,13 @@ class base_handler(ABC):
     def propagate_task_ids(self, job):
         return
 
+    # get_dirs returns the directories for this jobs TEMP and OUT 
+    # creating them if they do not yet exist
+    # output should be stored in response['SHARED']
+    @abstractmethod
+    def get_dirs(self, job):
+        return
+
     @abstractmethod
     def register(self, job_id, task):
         return
