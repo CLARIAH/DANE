@@ -1,12 +1,18 @@
 import pika
 import uuid
 import json
+from DANE_utils import jobspec
 
 class filesize_server():
 
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config['RABBITMQ']
+        credentials = pika.PlainCredentials(self.config['user'], 
+                self.config['password'])
         self.connection = pika.BlockingConnection(
-                    pika.ConnectionParameters(host='localhost'))
+                    pika.ConnectionParameters(
+                        credentials=credentials,
+                        host=self.config['host'], port=self.config['port']))
 
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue='response_queue', exclusive=True)
@@ -28,20 +34,32 @@ class filesize_server():
         self.channel.stop_consuming()
 
     def simulate_request(self):
-        job_spec = {'file': __file__}
+        job = jobspec.jobspec(source_url=__file__, 
+            source_id='TEST', source_set='TEST',
+            tasks=jobspec.taskSequential(['FILESIZE']))
 
         self.corr_id = str(uuid.uuid4())
         self.channel.basic_publish(
-            exchange='DANE',
+            exchange=self.config['exchange'],
             routing_key='plaintext.filesize',
             properties=pika.BasicProperties(
                 reply_to='response_queue',
                 correlation_id=self.corr_id,
             ),
-            body=json.dumps(job_spec))
+            body=job.to_json())
 
 if __name__ == '__main__':
-    fss = filesize_server()
+    config = {
+        'RABBITMQ' : {
+            'host': 'localhost',
+            'exchange': 'DANE-exchange',
+            'port': 5672,
+            'user': 'guest',
+            'password': 'guest'
+        }
+    }
+
+    fss = filesize_server(config)
 
     print('## Simulating request for size of this file')
     fss.simulate_request()

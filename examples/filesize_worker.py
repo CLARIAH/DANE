@@ -1,5 +1,5 @@
 from DANE_utils.base_classes import base_worker
-from os.path import getsize
+from os.path import getsize, exists
 import json
 
 class filesize_worker(base_worker):
@@ -14,16 +14,19 @@ class filesize_worker(base_worker):
         super().__init__(queue=self.__queue_name, 
                 binding_key='#.filesize', config=config)
 
-    def callback(self, job_request):
-        print('Got request', job_request)
-        fs = getsize(job_request['file'])
+    def callback(self, job):
+        print('Got request', job)
 
-        return json.dumps({'state': 200,
-            'message': 'Success',
-            'filesize': fs})
+        if exists(job.source_url):
+            fs = getsize(job.source_url)
+            return json.dumps({'state': 200,
+                'message': 'Success',
+                'filesize': fs})
+        else: 
+            return json.dumps({'state': 404,
+                'message': 'No file found at source_url'})
 
 if __name__ == '__main__':
-
     config = {
         'RABBITMQ' : {
             'host': 'localhost',

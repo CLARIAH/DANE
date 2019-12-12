@@ -2,11 +2,12 @@ from DANE_utils import jobspec
 from abc import ABC, abstractmethod
 import pika
 import json
+import threading
+import functools
 
 class base_worker(ABC):
 
     def __init__(self, queue, binding_key, config):
-        
         self.queue = queue
         self.binding_key = binding_key
 
@@ -55,8 +56,32 @@ class base_worker(ABC):
         self.channel.stop_consuming()
 
     def _callback(self, ch, method, props, body):
-        response = self.callback(jobspec.jobspec.from_json(body))
+        try:
+            job = jobspec.jobspec.from_json(body)
+        except TypeError as e:
+            response = { 'state': 400, 
+                    'message': 'Invalid job format, unable to proceed'}
 
+            self._ack_and_reply(json.dumps(response), ch, method, props)
+        except Exception as e:
+            response = { 'state': 500, 
+                    'message': 'Unhandled error: ' + str(e)}
+
+            self._ack_and_reply(json.dumps(response), ch, method, props)
+        else: 
+            self.thread = threading.Thread(target=self._run, 
+                    args=(job, ch, method, props))
+            self.thread.setDaemon(True)
+            self.thread.start()
+
+    def _run(self, job, ch, method, props):
+        response = self.callback(job)
+
+        reply_cb = functools.partial(self._ack_and_reply, json.dumps(response),
+                ch, method, props)
+        self.connection.add_callback_threadsafe(reply_cb)
+
+    def _ack_and_reply(self, response, ch, method, props):
         ch.basic_publish(exchange='',
                      routing_key=props.reply_to,
                      properties=pika.BasicProperties(
