@@ -136,6 +136,9 @@ class Task():
         return self.api.run(task_id = self.task_id)
 
     def isDone(self):
+        if self.task_state is not None:
+            return self.task_state == 200
+
         if self.task_id is None:
             raise DANError.APIRegistrationError('Cannot check doneness of an'\
                     'unregistered task')
