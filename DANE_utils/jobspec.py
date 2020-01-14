@@ -148,6 +148,10 @@ class Task():
     def set_api(self, api):
         self.api = api
 
+    def apply(self, fn):
+        fn(self)
+        return self
+
     def to_json(self):
         task_data = { "task_key": self.task_key.upper(),
                 "task_id": self.task_id,
@@ -217,6 +221,12 @@ class taskContainer():
 
     def __contains__(self, item):
         return self._tasks.__contains__(item)
+
+    def apply(self, fn):
+        for t in self._tasks:
+            t.apply(fn)
+        fn(self)
+        return self
 
     def to_json(self):
         tstr = []
