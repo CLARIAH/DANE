@@ -124,6 +124,18 @@ class base_handler(ABC):
     def getTaskState(self, task_id):
         return
 
+    @abstractmethod
+    def getTaskKey(self, task_id):
+        return
+
+    @abstractmethod
+    def jobFromJobId(self, job_id):
+        return
+
+    @abstractmethod
+    def jobFromTaskId(self, task_id):
+        return
+
     def isDone(self, task_id):
         return self.getTaskState(task_id) == 200
 
@@ -133,4 +145,8 @@ class base_handler(ABC):
 
     @abstractmethod
     def callback(self, task_id, response):
+        return
+
+    @abstractmethod
+    def search(self, source_id, source_set=None):
         return

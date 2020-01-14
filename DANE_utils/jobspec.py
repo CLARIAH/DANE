@@ -13,14 +13,13 @@ class jobspec():
         self.api = api
         self.job_id = job_id
 
-        if isinstance(tasks, str):
-            tasks = taskContainer.from_json(tasks, self.api)
-        elif isinstance(tasks, dict):
-            tasks = taskContainer._from_dict(tasks, self.api)
+        if isinstance(tasks, str) or isinstance(tasks, dict):
+            tasks = parse(tasks)
         elif not isinstance(tasks, taskContainer):
-            raise TypeError("Tasks should be taskContainer " + \
-                    "subclass, or JSON serialised taskContainer")
+            raise TypeError("Tasks should be Task, taskContainer " + \
+                    "subclass, or JSON serialised task_str")
         self.tasks = tasks
+        self.tasks.set_api(self.api)
 
         self.metadata = metadata
         self.priority = priority
@@ -33,11 +32,13 @@ class jobspec():
         astr = []
         for kw in vars(self):
             if kw == 'tasks':
-                astr.append("\"tasks\" : {}".format(getattr(self, kw).to_json()))
+                astr.append("\"tasks\" : {}".format(getattr(self, 
+                    kw).to_json()))
             elif kw == 'api':
                 continue
             else: 
-                astr.append("\"{}\" : {}".format(kw, json.dumps(getattr(self, kw))))
+                astr.append("\"{}\" : {}".format(kw, 
+                    json.dumps(getattr(self, kw))))
         return "{{ {} }}".format(', '.join(astr))
 
     @staticmethod
@@ -54,7 +55,8 @@ class jobspec():
         if self.job_id is not None:
             raise DANError.APIRegistrationError('Job already registered')
         elif self.api is None:
-            raise DANError.MissingEndpointError('No endpoint found to register job')
+            raise DANError.MissingEndpointError('No endpoint found to'\
+                    'register job')
 
         if 'SHARED' not in self.response.keys():
             self.response['SHARED'] = {}
@@ -73,56 +75,95 @@ class jobspec():
     def isDone(self):
         return self.tasks.isDone()
 
+# If input is a string, it tries to parse it as json
+# if its still a string, then its a task str, so parse it as such
+# otherwise we expect it to be a length 1 dict, with format:
+# { CLASSNAME : { params } } or { CLASSNAME : [ sub_tasks ] }
+# in the latter case, the class is expected to be a taskContainer subclass
+# and the classname should start with 'task' (lowercase)
+def parse(task_str):
+    if isinstance(task_str, str):
+        try:
+            task_str = json.loads(task_str)
+        except json.JSONDecodeError:
+            pass
+
+    if isinstance(task_str, str):
+        task = Task(task_str)
+    elif isinstance(task_str, dict) and len(task_str) == 1:
+        cls, params = list(task_str.items())[0]
+        if cls == 'Task':
+            task = Task(**params)
+        elif hasattr(sys.modules[__name__], cls) \
+                and cls.startswith('task'):
+            cls = getattr(sys.modules[__name__], cls)
+            task = cls(params)
+        else: 
+            raise TypeError(
+                    "{} must be Task or taskContainer subclass".format(task_str))
+    else:
+        raise ValueError("Expected task_str to be str or serialised class dict.")
+    return task
+
 class Task():
-    def __init__(self, task_key, _id = None, api = None):
+    def __init__(self, task_key, task_id = None, api = None, task_state=None, task_msg=None):
         if task_key is None or task_key == '':
             raise ValueError("task key cannot be empty string \"\" or None")
-        elif ":" in task_key:
-            if _id is not None:
-                raise ValueError("Invalid task_key, `:` not permitted in task_key when _id is provided")
-            else:
-                _id, task_key = task_key.split(":")
 
-        self.task_key = task_key
-        self.task_id = _id
+        self.task_key = task_key.upper()
+        self.task_id = task_id
+        self.task_state = task_state
+        self.task_msg = task_msg
         self.api = api
 
     def register(self, job_id):
         if self.task_id is not None:
             raise DANError.APIRegistrationError('Task already registered')
         elif self.api is None:
-            raise DANError.MissingEndpointError('No endpoint found to register task')
+            raise DANError.MissingEndpointError('No endpoint found to'\
+                    'register task')
 
         self.task_id = self.api.register(job_id=job_id, task=self)
 
     def run(self):
         if self.task_id is None:
-            raise DANError.APIRegistrationError('Cannot run an unregistered task')
+            raise DANError.APIRegistrationError('Cannot run an unregistered'\
+                    'task')
         elif self.api is None:
-            raise DANError.MissingEndpointError('No endpoint found to perform task')
+            raise DANError.MissingEndpointError('No endpoint found'\
+                    'to perform task')
 
         return self.api.run(task_id = self.task_id)
 
     def isDone(self):
         if self.task_id is None:
-            raise DANError.APIRegistrationError('Cannot check doneness of an unregistered task')
+            raise DANError.APIRegistrationError('Cannot check doneness of an'\
+                    'unregistered task')
         elif self.api is None:
-            raise DANError.MissingEndpointError('No endpoint found to check task doneness against')
+            raise DANError.MissingEndpointError('No endpoint found to check'\
+                    'task doneness against')
 
         return self.api.isDone(task_id = self.task_id)
-
-    def to_json(self):
-        if self.task_id is None:
-            return "\"{}\"".format(self.task_key)
-        else:
-            return "\"{}:{}\"".format(self.task_id, self.task_key)
 
     def set_api(self, api):
         self.api = api
 
+    def to_json(self):
+        task_data = { "task_key": self.task_key.upper(),
+                "task_id": self.task_id,
+                "task_state": self.task_state,
+                "task_msg": self.task_msg}
+
+        frmt = { k:v for k,v in task_data.items() if v is not None}
+
+        if len(frmt.keys()) > 1:
+            return "{{ \"Task\" : {}}}".format(json.dumps(frmt))
+        else:
+            return "\"{}\"".format(frmt['task_key'])
+
     @staticmethod
     def from_json(json_str):
-        return Task(json_str)
+        return parse(json_str)
 
     def __str__(self):
         return self.to_json()
@@ -134,25 +175,21 @@ class taskContainer():
         self.api = api
 
     def add_task(self, task):
-        if isinstance(task, str):
-            task = Task(task, api=self.api)
+        if not isinstance(task, taskContainer) and \
+                not isinstance(task, Task):
+            task = parse(task)
+        task.set_api(self.api)
 
-        if self._verify_task(task):
-            return self._tasks.append(task)
+        return self._tasks.append(task)
 
     # TODO should this raise an exception if all subtasks are done?
     def run(self):
-        return NotImplementedError('Subclasses of taskContainer should implement run method')
+        return NotImplementedError('Subclasses of taskContainer should'\
+                'implement run method')
 
     def isDone(self):
-        return NotImplementedError('Subclasses of taskContainer should implement isDone method')
-
-    def _verify_task(self, task):
-        if not isinstance(task, Task) and not isinstance(task, taskContainer):
-            raise TypeError(
-                    "{} must be Task or taskContainer subclass".format(
-                        type(task)))
-        return True
+        return NotImplementedError('Subclasses of taskContainer should'\
+                'implement isDone method')
 
     def set_api(self, api):
         self.api = api
@@ -170,8 +207,7 @@ class taskContainer():
         return self._tasks.__getitem__(key)
 
     def __setitem__(self, key, value):
-        if self._verify_task(value):
-            return self._tasks.__setitem__(key, value)
+        return self._tasks.__setitem__(key, parse(value))
 
     def __delitem__(self, key, value):
         return self._tasks.__setitem__(key, value)
@@ -195,44 +231,7 @@ class taskContainer():
 
     @staticmethod
     def from_json(json_str, api=None):
-        if isinstance(json_str, str):
-            data = json.loads(json_str)
-        else:
-            data = json_str
-        return taskContainer._from_dict(data)
-
-    @staticmethod
-    def _from_dict(dct, api=None):
-        if len(dct) != 1:
-            raise ValueError("Expected dict to be in { <classname> : [<tasks>] } format.")
-        else:
-            cls, tasks = list(dct.items())[0]
-            
-            if not hasattr(sys.modules[__name__], cls) or not cls.startswith('task'):
-                raise TypeError("Invalid container name," \
-                        "expected {} to be taskContainer subclass.".format(
-                            cls))
-            else:
-                cls = getattr(sys.modules[__name__], cls)
-                container = cls(api=api)
-                if not isinstance(container, taskContainer):
-                    raise TypeError("Expected {} to be a taskContainer subclass.".format(
-                            type(container)))
-
-                container._from_json(tasks)
-                return container
-
-    def _from_json(self, data, api=None):
-        if isinstance(data, dict):
-            self.add_task(self._from_dict(data, api))
-        elif isinstance(data, list):
-            for task in data:
-                self._from_json(task, api)
-        elif isinstance(data, str):
-            self.add_task(data) 
-        else:
-            raise TypeError("{} must be string, list, or dict.".format(
-                        type(data)))
+        return parse(json_str)
 
     def __str__(self):
         return self.to_json()

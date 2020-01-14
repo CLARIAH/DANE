@@ -21,13 +21,37 @@ class DummyHandler(base_handler):
             # store job state as HTTP response codes
             self.task_register[idx] = (task, 202, job_id)
         else:
-            raise APIRegistrationError('Unregistered job or unknown job id! Register job first')
+            raise APIRegistrationError('Unregistered job or unknown job id!'\
+                    'Register job first')
         return idx
 
     def getTaskState(self, task_id):
         return self.task_register[task_id][1]
 
+    def getTaskKey(self, task_id):
+        return self.task_register[task_id][0]
+
+    def jobFromJobId(self, job_id):
+        return self.job_register[job_id] 
+
+    def jobFromTaskId(self, task_id):
+        return self.job_register[self.task_register[task_id][2]] 
+
     def run(self, task_id):
         task, state, job_id = self.task_register[task_id]
         self.task_register[task_id] = (task, 200, job_id)
-        print('DummyEndpoint: Executed task {} for job: {}'.format(task.task_key, job_id))
+        print('DummyEndpoint: Executed task {} for '\
+                'job: {}'.format(task.task_key, job_id))
+
+    def callback(self, task_id, response):
+        print('DummyEndpoint: Callback response {} for '\
+                'task_id: {}'.format(response, task_id))
+
+    def get_dirs(self, job):
+        return {
+            'TEMP_FOLDER': './',
+            'OUT_FOLDER': './'
+        }
+
+    def search(self, source_id, source_set=None):
+        return
