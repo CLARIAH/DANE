@@ -69,8 +69,26 @@ class jobspec():
 
         self.api.propagate_task_ids(job=self)
 
+    def refresh(self):
+        if self.job_id is None:
+            raise DANError.APIRegistrationError(
+                    'Cannot refresh unregistered job')
+        elif self.api is None:
+            raise DANError.MissingEndpointError('No endpoint found to'\
+                    'refresh job')
+
+        # retrieve latest information for fields that might have been changed
+        # and refresh their values
+        job = self.api.jobFromJobId(self.job_id, get_state=True)
+        self.tasks = job.tasks
+        self.response = job.response
+        self.metadata = job.metadata
+
     def run(self):
         return self.tasks.run()
+
+    def retry(self):
+        return self.tasks.retry()
 
     def isDone(self):
         return self.tasks.isDone()
@@ -135,6 +153,16 @@ class Task():
 
         return self.api.run(task_id = self.task_id)
 
+    def retry(self):
+        if self.task_id is None:
+            raise DANError.APIRegistrationError('Cannot retry an unregistered'\
+                    'task')
+        elif self.api is None:
+            raise DANError.MissingEndpointError('No endpoint found'\
+                    'to perform task')
+
+        return self.api.retry(task_id = self.task_id)
+
     def isDone(self):
         if self.task_state is not None:
             return self.task_state == 200
@@ -193,6 +221,10 @@ class taskContainer():
     def run(self):
         return NotImplementedError('Subclasses of taskContainer should'\
                 'implement run method')
+
+    def retry(self):
+        return NotImplementedError('Subclasses of taskContainer should'\
+                'implement retry method')
 
     def isDone(self):
         return NotImplementedError('Subclasses of taskContainer should'\
@@ -262,6 +294,12 @@ class taskSequential(taskContainer):
                 task.run()
                 return
 
+    def retry(self):
+        for task in self:
+            if not task.isDone():
+                task.retry()
+                return
+
     def isDone(self):
         for task in self:
             if not task.isDone():
@@ -277,7 +315,13 @@ class taskParallel(taskContainer):
 
     def run(self):
         for task in self:
-            task.run()
+            if not task.isDone():
+                task.run()
+
+    def retry(self):
+        for task in self:
+            if not task.isDone():
+                task.retry()
 
     def isDone(self):
         for task in self:

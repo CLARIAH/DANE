@@ -144,9 +144,17 @@ class base_handler(ABC):
         return
 
     @abstractmethod
+    def retry(self, task_id):
+        return
+
+    @abstractmethod
     def callback(self, task_id, response):
         return
 
     @abstractmethod
     def search(self, source_id, source_set=None):
+        return
+
+    @abstractmethod
+    def getUnfinished(self):
         return
