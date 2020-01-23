@@ -1,0 +1,259 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Welcome to DANE-utils’s documentation! &#8212; DANE-utils  documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-DANE_utils.jobspec">
+<span id="welcome-to-dane-utils-s-documentation"></span><h1>Welcome to DANE-utils’s documentation!<a class="headerlink" href="#module-DANE_utils.jobspec" title="Permalink to this headline">¶</a></h1>
+<dl class="class">
+<dt id="DANE_utils.jobspec.jobspec">
+<em class="property">class </em><code class="sig-prename descclassname">DANE_utils.jobspec.</code><code class="sig-name descname">jobspec</code><span class="sig-paren">(</span><em class="sig-param">source_url</em>, <em class="sig-param">source_id</em>, <em class="sig-param">source_set</em>, <em class="sig-param">tasks</em>, <em class="sig-param">job_id=None</em>, <em class="sig-param">metadata={}</em>, <em class="sig-param">priority=1</em>, <em class="sig-param">response={}</em>, <em class="sig-param">api=None</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec" title="Permalink to this definition">¶</a></dt>
+<dd><p>This is a class representation of a job in DANE, it holds both data 
+and logic.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>source_url</strong> (<em>str</em>) – URL pointing to source material for this block</p></li>
+<li><p><strong>source_id</strong> (<em>str</em>) – Id of the source object within the source collection</p></li>
+<li><p><strong>source_set</strong> (<em>str</em>) – Identifier specifying the source collection the
+material is from.</p></li>
+<li><p><strong>tasks</strong> – A specification of the tasks to be performed</p></li>
+<li><p><strong>job_id</strong> (<em>int</em><em>, </em><em>optional</em>) – ID of the job, assigned by DANE-core</p></li>
+<li><p><strong>metadata</strong> (<em>dict</em><em>, </em><em>optional</em>) – Dictionary containing metadata related to the job, or
+the source material</p></li>
+<li><p><strong>priority</strong> (<em>int</em><em>, </em><em>optional</em>) – Priority of the job in the task queue, defaults to 1</p></li>
+<li><p><strong>response</strong> (<em>dict</em><em>, </em><em>optional</em>) – Dictionary containing results from other tasks</p></li>
+<li><p><strong>api</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">base_classes.base_handler</span></code>, optional) – Reference to a class:<cite>base_classes.base_handler</cite> which is
+used to communicate with the database, and queueing system.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.from_json">
+<em class="property">static </em><code class="sig-name descname">from_json</code><span class="sig-paren">(</span><em class="sig-param">json_str</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.from_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructs a <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.jobspec</span></code> instance from a JSON string</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>json_str</strong> (<em>str</em>) – Serialised <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.jobspec</span></code></p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>JSON string of the job</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.jobspec</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.isDone">
+<code class="sig-name descname">isDone</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.isDone" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check if all tasks have completed.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.refresh">
+<code class="sig-name descname">refresh</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.refresh" title="Permalink to this definition">¶</a></dt>
+<dd><p>Retrieves the latest information for any fields that might have
+changed their values since the creation of this job. Requires an API
+to be set.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.register">
+<code class="sig-name descname">register</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.register" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register this job with DANE-core, this will assign a job_id to the
+job, and a task_id to all tasks. Requires an API to be set.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.retry">
+<code class="sig-name descname">retry</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.retry" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to run the tasks in this job again. Unlike 
+<code class="xref py py-func docutils literal notranslate"><span class="pre">jobspec.jobspec.run()</span></code> this will attempt to run tasks which 
+encountered an error state.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.run">
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.run" title="Permalink to this definition">¶</a></dt>
+<dd><p>Run the tasks in this job.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.set_api">
+<code class="sig-name descname">set_api</code><span class="sig-paren">(</span><em class="sig-param">api</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.set_api" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the API for the job and all subtasks</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>api</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">base_classes.base_handler</span></code>, optional) – Reference to a <code class="xref py py-class docutils literal notranslate"><span class="pre">base_classes.base_handler</span></code> which is
+used to communicate with the database, and queueing system.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="DANE_utils.jobspec.jobspec.to_json">
+<code class="sig-name descname">to_json</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.jobspec.to_json" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns this job serialised as JSON</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>JSON string of the job</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="DANE_utils.jobspec.parse">
+<code class="sig-prename descclassname">DANE_utils.jobspec.</code><code class="sig-name descname">parse</code><span class="sig-paren">(</span><em class="sig-param">task_str</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.parse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tries to parse a serialised <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.Task</span></code> or
+<code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.taskContainer</span></code>, returning the correct object.</p>
+<p>If input is a string, it tries to parse it as json if its still a string
+after this, then its a task str, so parse it as a Task.
+Otherwise we expect it to be a length 1 dict, with format:
+{ CLASSNAME : { params } } or { CLASSNAME : [ sub_tasks ] }.
+In this case the class is expected to be a taskContainer subclass
+and the classname should start with ‘task’ (lowercase)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>task_str</strong> (<em>dict</em>) – Serialised <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.Task</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.taskContainer</span></code></p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Instance of <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.Task</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.taskContainer</span></code></p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.Task</span></code> or <code class="xref py py-class docutils literal notranslate"><span class="pre">jobspec.taskContainer</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="class">
+<dt id="DANE_utils.jobspec.taskContainer">
+<em class="property">class </em><code class="sig-prename descclassname">DANE_utils.jobspec.</code><code class="sig-name descname">taskContainer</code><span class="sig-paren">(</span><em class="sig-param">name='taskContainer'</em>, <em class="sig-param">api=None</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.taskContainer" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="DANE_utils.jobspec.taskContainer.register">
+<code class="sig-name descname">register</code><span class="sig-paren">(</span><em class="sig-param">job_id</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.taskContainer.register" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register a virtual subclass of an ABC.</p>
+<p>Returns the subclass, to allow usage as a class decorator.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="DANE_utils.jobspec.taskParallel">
+<em class="property">class </em><code class="sig-prename descclassname">DANE_utils.jobspec.</code><code class="sig-name descname">taskParallel</code><span class="sig-paren">(</span><em class="sig-param">tasks=[]</em>, <em class="sig-param">api=None</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.taskParallel" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="DANE_utils.jobspec.taskSequential">
+<em class="property">class </em><code class="sig-prename descclassname">DANE_utils.jobspec.</code><code class="sig-name descname">taskSequential</code><span class="sig-paren">(</span><em class="sig-param">tasks=[]</em>, <em class="sig-param">api=None</em><span class="sig-paren">)</span><a class="headerlink" href="#DANE_utils.jobspec.taskSequential" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<div class="toctree-wrapper compound">
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">DANE-utils</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Nanne van Noord.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

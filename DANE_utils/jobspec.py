@@ -1,11 +1,41 @@
 import json
 import sys
+from abc import ABC, abstractmethod
 from DANE_utils import errors as DANError
 
 class jobspec():
+    """This is a class representation of a job in DANE, it holds both data 
+    and logic.
+
+    :param source_url: URL pointing to source material for this block
+    :type source_url: str
+    :param source_id: Id of the source object within the source collection
+    :type source_id: str
+    :param source_set: Identifier specifying the source collection the
+        material is from.
+    :type source_set: str
+    :param tasks: A specification of the tasks to be performed
+    :type source_set: class:`jobspec.taskContainer`
+    :type source_set: class:`jobspec.Task`
+    :type source_set: str
+    :param job_id: ID of the job, assigned by DANE-core
+    :type job_id: int, optional
+    :param metadata: Dictionary containing metadata related to the job, or
+        the source material
+    :type metadata: dict, optional
+    :param priority: Priority of the job in the task queue, defaults to 1
+    :type priority: int, optional
+    :param response: Dictionary containing results from other tasks
+    :type response: dict, optional
+    :param api: Reference to a class:`base_classes.base_handler` which is
+        used to communicate with the database, and queueing system.
+    :type api: :class:`base_classes.base_handler`, optional
+    """
+
     def __init__(self, source_url, source_id, source_set, tasks,
             job_id=None, metadata={}, priority=1, response={}, api=None):
-
+        """Constructor method
+        """
         # TODO add more input validation
         self.source_url = source_url
         self.source_id = source_id
@@ -29,6 +59,11 @@ class jobspec():
         return self.to_json()
 
     def to_json(self):
+        """Returns this job serialised as JSON
+
+        :return: JSON string of the job
+        :rtype: str
+        """
         astr = []
         for kw in vars(self):
             if kw == 'tasks':
@@ -43,15 +78,31 @@ class jobspec():
 
     @staticmethod
     def from_json(json_str):
+        """Constructs a :class:`jobspec.jobspec` instance from a JSON string
+
+        :param json_str: Serialised :class:`jobspec.jobspec`
+        :type json_str: str
+        :return: JSON string of the job
+        :rtype: :class:`jobspec.jobspec`
+        """
         data = json.loads(json_str)
         return jobspec(**data)
 
     def set_api(self, api):
+        """Set the API for the job and all subtasks
+
+        :param api: Reference to a :class:`base_classes.base_handler` which is
+            used to communicate with the database, and queueing system.
+        :type api: :class:`base_classes.base_handler`, optional
+        """
         self.api = api
         for t in self.tasks:
             t.set_api(api)
 
     def register(self):
+        """Register this job with DANE-core, this will assign a job_id to the
+        job, and a task_id to all tasks. Requires an API to be set.
+        """
         if self.job_id is not None:
             raise DANError.APIRegistrationError('Job already registered')
         elif self.api is None:
@@ -70,6 +121,10 @@ class jobspec():
         self.api.propagate_task_ids(job=self)
 
     def refresh(self):
+        """Retrieves the latest information for any fields that might have
+        changed their values since the creation of this job. Requires an API
+        to be set.
+        """
         if self.job_id is None:
             raise DANError.APIRegistrationError(
                     'Cannot refresh unregistered job')
@@ -77,29 +132,45 @@ class jobspec():
             raise DANError.MissingEndpointError('No endpoint found to'\
                     'refresh job')
 
-        # retrieve latest information for fields that might have been changed
-        # and refresh their values
         job = self.api.jobFromJobId(self.job_id, get_state=True)
         self.tasks = job.tasks
         self.response = job.response
         self.metadata = job.metadata
 
     def run(self):
+        """Run the tasks in this job.
+        """
         return self.tasks.run()
 
     def retry(self):
+        """Try to run the tasks in this job again. Unlike 
+        :func:`jobspec.jobspec.run` this will attempt to run tasks which 
+        encountered an error state.
+        """
         return self.tasks.retry()
 
     def isDone(self):
+        """Check if all tasks have completed.
+        """
         return self.tasks.isDone()
 
-# If input is a string, it tries to parse it as json
-# if its still a string, then its a task str, so parse it as such
-# otherwise we expect it to be a length 1 dict, with format:
-# { CLASSNAME : { params } } or { CLASSNAME : [ sub_tasks ] }
-# in the latter case, the class is expected to be a taskContainer subclass
-# and the classname should start with 'task' (lowercase)
 def parse(task_str):
+    """Tries to parse a serialised :class:`jobspec.Task` or
+    :class:`jobspec.taskContainer`, returning the correct object.
+
+    If input is a string, it tries to parse it as json if its still a string
+    after this, then its a task str, so parse it as a Task.
+    Otherwise we expect it to be a length 1 dict, with format:
+    { CLASSNAME : { params } } or { CLASSNAME : [ sub_tasks ] }.
+    In this case the class is expected to be a taskContainer subclass
+    and the classname should start with 'task' (lowercase)
+
+    :param task_str: Serialised :class:`jobspec.Task` or :class:`jobspec.taskContainer`
+    :type task_str: str
+    :type task_str: dict
+    :return: Instance of :class:`jobspec.Task` or :class:`jobspec.taskContainer`
+    :rtype: :class:`jobspec.Task` or :class:`jobspec.taskContainer`
+    """
     if isinstance(task_str, str):
         try:
             task_str = json.loads(task_str)
@@ -203,7 +274,7 @@ class Task():
     def __str__(self):
         return self.to_json()
 
-class taskContainer():
+class taskContainer(ABC):
     def __init__(self, name = 'taskContainer', api=None):
         self._tasks = []
         self._name = name
@@ -218,17 +289,17 @@ class taskContainer():
         return self._tasks.append(task)
 
     # TODO should this raise an exception if all subtasks are done?
+    @abstractmethod
     def run(self):
-        return NotImplementedError('Subclasses of taskContainer should'\
-                'implement run method')
+        return
 
+    @abstractmethod
     def retry(self):
-        return NotImplementedError('Subclasses of taskContainer should'\
-                'implement retry method')
+        return
 
+    @abstractmethod
     def isDone(self):
-        return NotImplementedError('Subclasses of taskContainer should'\
-                'implement isDone method')
+        return
 
     def set_api(self, api):
         self.api = api
