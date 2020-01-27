@@ -1,5 +1,5 @@
-# DANE-utils
-The Distributed Annotation 'n' Enrichment (DANE) system handles compute job assignment and file storage for the automatic annotation of content available in the [MediaSuite](https://mediasuite.clariah.nl/).
+# DANE
+The Distributed Annotation 'n' Enrichment (DANE) system handles compute job assignment and file storage for the automatic annotation of content.
 
 This repository contains contains the building blocks for with DANE, such as creating custom analysis workers or submitting new jobs. Code is still in development, and somewhat untested.
 
