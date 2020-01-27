@@ -7,7 +7,7 @@ Welcome to DANE-utils's documentation!
 
     intro
     installation
-    api/index
+    DANE/index
     examples
 
 Indices and tables

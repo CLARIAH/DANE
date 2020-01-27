@@ -1,4 +1,4 @@
 Installation instructions
 ======================================
 
-https://github.com/CLARIAH/DANE-utils#installation
+https://github.com/CLARIAH/DANE#installation

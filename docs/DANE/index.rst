@@ -6,4 +6,7 @@ API stuff
 .. toctree::
     :maxdepth: 2
 
-    jobspec
+    tasks
+    taskcontainers
+    jobs
+    utils

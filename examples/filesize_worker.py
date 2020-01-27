@@ -1,4 +1,4 @@
-from DANE_utils.base_classes import base_worker
+from DANE.base_classes import base_worker
 from os.path import getsize, exists
 import json
 

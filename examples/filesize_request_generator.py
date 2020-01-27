@@ -1,7 +1,7 @@
 import pika
 import uuid
 import json
-from DANE_utils import jobspec
+from DANE import Job
 
 class filesize_server():
 
@@ -34,9 +34,9 @@ class filesize_server():
         self.channel.stop_consuming()
 
     def simulate_request(self):
-        job = jobspec.jobspec(source_url=__file__, 
+        job = DANE.Job(source_url=__file__, 
             source_id='TEST', source_set='TEST',
-            tasks=jobspec.taskSequential(['FILESIZE']))
+            tasks=DANE.taskSequential(['FILESIZE']))
 
         self.corr_id = str(uuid.uuid4())
         self.channel.basic_publish(

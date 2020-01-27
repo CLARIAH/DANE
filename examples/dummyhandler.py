@@ -1,4 +1,4 @@
-from DANE_utils.base_classes import base_handler
+from DANE.base_classes import base_handler
 import uuid
 
 class DummyHandler(base_handler):
@@ -43,6 +43,12 @@ class DummyHandler(base_handler):
         print('DummyEndpoint: Executed task {} for '\
                 'job: {}'.format(task.task_key, job_id))
 
+    def retry(self, task_id):
+        task, state, job_id = self.task_register[task_id]
+        self.task_register[task_id] = (task, 200, job_id)
+        print('DummyEndpoint: Retried task {} for '\
+                'job: {}'.format(task.task_key, job_id))
+
     def callback(self, task_id, response):
         print('DummyEndpoint: Callback response {} for '\
                 'task_id: {}'.format(response, task_id))
@@ -55,3 +61,7 @@ class DummyHandler(base_handler):
 
     def search(self, source_id, source_set=None):
         return
+
+    def getUnfinished(self):
+        return [i for t,s,i in self.task_register if s == 200]
+

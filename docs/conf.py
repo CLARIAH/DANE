@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'DANE-utils'
+project = 'DANE'
 copyright = '2020, Nanne van Noord'
 author = 'Nanne van Noord'
 
