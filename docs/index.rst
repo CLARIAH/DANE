@@ -1,4 +1,4 @@
-Welcome to DANE-utils's documentation!
+Welcome to the documentation for DANE!
 ======================================
 
 .. toctree::
