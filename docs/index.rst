@@ -1,12 +1,14 @@
 Welcome to DANE-utils's documentation!
 ======================================
 
-.. automodule:: DANE_utils.jobspec
-    :members:
-
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+    :maxdepth: 2
+    :caption: Contents:
+
+    intro
+    installation
+    api/index
+    examples
 
 Indices and tables
 ==================
