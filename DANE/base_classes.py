@@ -1,4 +1,4 @@
-from DANE_utils import jobspec
+import DANE
 from abc import ABC, abstractmethod
 import pika
 import json
@@ -6,7 +6,21 @@ import threading
 import functools
 
 class base_worker(ABC):
+    """Abstract base class for a worker. 
 
+    This class contains most of the logic of dealing with DANE-core,
+    classes (workers) inheriting from this class only need to specific the
+    callback method.
+    
+    :param queue: Name of the queue for this worker
+    :type queue: str
+    :param binding_key: A str following the format as explained
+        here: https://www.rabbitmq.com/tutorials/tutorial-five-python.html
+        or a list of such strings
+    :type binding_key: str or list
+    :param config: Config settings of the worker
+    :type config: dict
+    """
     def __init__(self, queue, binding_key, config):
         self.queue = queue
         self.binding_key = binding_key
@@ -33,9 +47,6 @@ class base_worker(ABC):
                 arguments={'x-max-priority': 10},
                 durable=True)
 
-        # binding_key can be a single str following the format as explained
-        # here: https://www.rabbitmq.com/tutorials/tutorial-five-python.html
-        # or it can be a list of such strings
         if not isinstance(self.binding_key, list):
             self.binding_key = [self.binding_key]
 
@@ -50,14 +61,18 @@ class base_worker(ABC):
                                    queue=self.queue)
 
     def run(self):
+        """Start listening for tasks to be executed.
+        """
         self.channel.start_consuming()
 
     def stop(self):
+        """Stop listening for tasks to be executed.
+        """
         self.channel.stop_consuming()
 
     def _callback(self, ch, method, props, body):
         try:
-            job = jobspec.jobspec.from_json(body)
+            job = DANE.Job.from_json(body)
         except TypeError as e:
             response = { 'state': 400, 
                     'message': 'Invalid job format, unable to proceed'}
@@ -77,7 +92,10 @@ class base_worker(ABC):
     def _run(self, job, ch, method, props):
         response = self.callback(job)
 
-        reply_cb = functools.partial(self._ack_and_reply, json.dumps(response),
+        if not isinstance(response, str):
+            response = json.dumps(response)
+
+        reply_cb = functools.partial(self._ack_and_reply, response,
                 ch, method, props)
         self.connection.add_callback_threadsafe(reply_cb)
 
@@ -93,14 +111,38 @@ class base_worker(ABC):
 
     @abstractmethod
     def callback(self, job_request):
+        """The callback contains the core functionality that is specific to
+        this worker. 
+
+        :param job_request: Job specification for new task
+        :type job_request: :class:`DANE.Job`
+        :return: dict (or JSON str) with the job message, state, and
+            additional response information
+        :rtype: dict or str
+        """
         return
 
 class base_handler(ABC):
+    """Abstract base class for a handler. 
+
+    A handler functions as the API used in DANE to facilitate all communication
+    with the database and the queueing system.
+    
+    :param config: Config settings for the handler
+    :type config: dict
+    """
     def __init__(self, config):
         self.config = config
 
     @abstractmethod
     def register_job(self, job):
+        """Register a job in the database
+
+        :param job: The job
+        :type job: :class:`DANE.Job`
+        :return: job_id
+        :rtype: int
+        """
         return
 
     # job objects task list is modified after each task is registered
@@ -118,14 +160,37 @@ class base_handler(ABC):
 
     @abstractmethod
     def register(self, job_id, task):
+        """Register a task in the database
+
+        :param job_id: id of the job this task belongs to
+        :type job_id: int
+        :param task: the task to register
+        :type task: :class:`DANE.Task`
+        :return: task_id
+        :rtype: int
+        """
         return
     
     @abstractmethod
     def getTaskState(self, task_id):
+        """Retrieve state for a given task_id
+
+        :param task_id: id of the task
+        :type task_id: int
+        :return: task_state
+        :rtype: int
+        """
         return
 
     @abstractmethod
     def getTaskKey(self, task_id):
+        """Retrieve task_key for a given task_id
+
+        :param task_id: id of the task
+        :type task_id: int
+        :return: task_key
+        :rtype: str
+        """
         return
 
     @abstractmethod

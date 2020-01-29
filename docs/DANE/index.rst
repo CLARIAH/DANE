@@ -9,4 +9,6 @@ API stuff
     tasks
     taskcontainers
     jobs
+    base_classes
     utils
+    errors

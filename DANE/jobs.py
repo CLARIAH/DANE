@@ -102,7 +102,7 @@ class Job():
         return self
 
     def register(self):
-        """Register this job with DANE-core, this will assign a job_id to the
+        """Register this job in DANE, this will assign a job_id to the
         job, and a task_id to all tasks. Requires an API to be set.
 
         :return: self
