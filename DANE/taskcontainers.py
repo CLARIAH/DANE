@@ -145,8 +145,7 @@ class taskContainer(ABC):
         Calls :func:`DANE.utils.parse` on the input.
 
         :param task_str: Serialised :class:`DANE.taskContainer`
-        :type task_str: str
-        :type task_str: dict
+        :type task_str: str or dict
         :return: An initialised instane of a taskContainer subclass
         :rtype: :class:`DANE.taskContainer`
         """

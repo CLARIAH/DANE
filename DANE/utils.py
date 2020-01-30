@@ -15,8 +15,7 @@ def parse(task_str):
     and the classname should start with 'task' (lowercase)
 
     :param task_str: Serialised :class:`DANE.Task` or :class:`DANE.taskContainer`
-    :type task_str: str
-    :type task_str: dict
+    :type task_str: str or dict
     :return: A initialised Task or taskContainer
     :rtype: :class:`DANE.Task` or :class:`DANE.taskContainer`
     """

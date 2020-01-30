@@ -25,6 +25,8 @@ Once a job is submitted to DANE-core its tasks will be assigned to workers and e
 its task assignment. To use DANE, one thus needs all three parts, namely an instance of DANE-core, some compute workers, and some client or process to submit jobs. 
 Examples of workers and clients can be found :doc:`here <examples>`, whereas DANE-core is documented in its repository.
 
+.. _states:
+
 Task states
 **********************
 

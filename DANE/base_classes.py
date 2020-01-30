@@ -14,7 +14,7 @@ class base_worker(ABC):
     
     :param queue: Name of the queue for this worker
     :type queue: str
-    :param binding_key: A str following the format as explained
+    :param binding_key: A string following the format as explained
         here: https://www.rabbitmq.com/tutorials/tutorial-five-python.html
         or a list of such strings
     :type binding_key: str or list
@@ -111,13 +111,13 @@ class base_worker(ABC):
 
     @abstractmethod
     def callback(self, job_request):
-        """The callback contains the core functionality that is specific to
-        this worker. 
+        """Function containing the core functionality that is specific to
+        a worker. 
 
         :param job_request: Job specification for new task
         :type job_request: :class:`DANE.Job`
-        :return: dict (or JSON str) with the job message, state, and
-            additional response information
+        :return: Task response with the `message`, `state`, and
+            optional additional response information
         :rtype: dict or str
         """
         return
@@ -126,7 +126,7 @@ class base_handler(ABC):
     """Abstract base class for a handler. 
 
     A handler functions as the API used in DANE to facilitate all communication
-    with the database and the queueing system.
+    with the database and the queueing system. 
     
     :param config: Config settings for the handler
     :type config: dict
@@ -145,17 +145,27 @@ class base_handler(ABC):
         """
         return
 
-    # job objects task list is modified after each task is registered
-    # to include task_ids, propagate this change
     @abstractmethod
     def propagate_task_ids(self, job):
+        """The task list is updated to include task_ids by the registration,
+        propagate this change to the underlying database.
+
+        :param job: The job
+        :type job: :class:`DANE.Job`
+        """
         return
 
-    # get_dirs returns the directories for this jobs TEMP and OUT 
-    # creating them if they do not yet exist
-    # output should be stored in response['SHARED']
     @abstractmethod
     def get_dirs(self, job):
+        """This function returns the TEMP and OUT directories for this job
+        creating them if they do not yet exist
+        output should be stored in response['SHARED']
+        
+        :param job: The job
+        :type job: :class:`DANE.Job`
+        :return: Dict with keys `TEMP_FOLDER` and `OUT_FOLDER`
+        :rtype: dict
+        """
         return
 
     @abstractmethod
@@ -195,31 +205,96 @@ class base_handler(ABC):
 
     @abstractmethod
     def jobFromJobId(self, job_id):
+        """Construct and return a :class:`DANE.Job` given a job_id
+        
+        :param job_id: The id for the job
+        :type job_id: int
+        :return: The job
+        :rtype: :class:`DANE.Job`
+        """
         return
 
     @abstractmethod
     def jobFromTaskId(self, task_id):
+        """Construct and return a :class:`DANE.Job` given a task_id
+        
+        :param task_id: The id of a task
+        :type task_id: int
+        :return: The job
+        :rtype: :class:`DANE.Job`
+        """
         return
 
     def isDone(self, task_id):
+        """Verify whether a task is done.
+
+        Doneness is determined by whether or not its state is `200`.
+        
+        :param task_id: The id of a task
+        :type task_id: int
+        :return: Task doneness
+        :rtype: bool
+        """
         return self.getTaskState(task_id) == 200
 
     @abstractmethod
     def run(self, task_id):
+        """Run the task with this id, and change its task state to `102`.
+
+        Running a task involves submitting it to a queue, so results might
+        only be available much later. Expects a task to have state `201`,
+        and it may retry tasks with state `502` or `503`.
+        
+        :param task_id: The id of a task
+        :type task_id: int
+        """
         return
 
     @abstractmethod
     def retry(self, task_id):
+        """Retry the task with this id, and change its task state to `102`.
+
+        Attempts to run a task which previously might have crashed. 
+        
+        :param task_id: The id of a task
+        :type task_id: int
+        """
         return
 
     @abstractmethod
     def callback(self, task_id, response):
+        """Function that is called once a task gives back a response.
+
+        This updates the state and response of the task in the database,
+        and then calls :func:`DANE.Job.run()` to trigger the next task.
+
+        :param task_id: The id of a task
+        :type task_id: int
+        :param response: Task response, should contain at least the `state`
+            and a `message`
+        :type response: dict
+        """
         return
 
     @abstractmethod
     def search(self, source_id, source_set=None):
+        """Returns jobs which exist for this source material.
+
+        :param source_id: The id of the source material
+        :type source_id: int
+        :param source_set: Specific source material collection to search n
+        :type source_set: str, optional
+        :return: ids of found jobs
+        :rtype: dict
+        """
         return
 
     @abstractmethod
     def getUnfinished(self):
+        """Returns jobs which are not finished and not queue, i.e., not state
+        `102` or `200` 
+
+        :return: ids of found jobs
+        :rtype: dict
+        """
         return

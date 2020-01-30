@@ -1,27 +1,26 @@
-from DANE.base_classes import base_worker
+import DANE
 from os.path import getsize, exists
 import json
 
-class filesize_worker(base_worker):
+class filesize_worker(DANE.base_classes.base_worker):
     # we specify a queue name because every worker of this type should 
     # listen to the same queue
     __queue_name = 'filesize_queue'
+    __binding_key = '#.FILESIZE'
 
     def __init__(self, config):
-        # routing key follows pattern of <file type>.<worker type>
-        # worker type is 'filesize' for this worker, and we listen
+        # routing key follows pattern of <file type>.<task key>
+        # task key is 'FILESIZE' for this worker, and we listen
         # for any possible filetype, so '#'
         super().__init__(queue=self.__queue_name, 
-                binding_key='#.filesize', config=config)
+                binding_key=self.__binding_key, config=config)
 
     def callback(self, job):
-        print('Got request', job)
-
         if exists(job.source_url):
             fs = getsize(job.source_url)
             return json.dumps({'state': 200,
                 'message': 'Success',
-                'filesize': fs})
+                'size': fs})
         else: 
             return json.dumps({'state': 404,
                 'message': 'No file found at source_url'})

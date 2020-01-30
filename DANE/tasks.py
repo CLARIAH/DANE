@@ -143,8 +143,7 @@ class Task():
         """Calls :func:`DANE.parse` on the input.
 
         :param task_str: Serialised :class:`DANE.Task`
-        :type task_str: str
-        :type task_str: dict
+        :type task_str: str or dict
         :return: An initialised Task
         :rtype: :class:`DANE.Task`
         """
