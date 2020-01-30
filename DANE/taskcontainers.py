@@ -82,10 +82,10 @@ class taskContainer(ABC):
         return self
 
     def register(self, job_id):
-        """Register underlying tasks with DANE-core, this will assign a task_id
+        """Register underlying tasks with DANE-server, this will assign a task_id
         to all tasks. Requires an API to be set.
 
-        taskContainers do not have a formal role inside DANE-core, and as such
+        taskContainers do not have a formal role inside DANE-server, and as such
         they will not be assigned an id.
 
         :return: self

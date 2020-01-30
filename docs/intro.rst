@@ -15,15 +15,15 @@ analysis, and post-hoc clean-up, DANE can be used to schedule these tasks such t
 Usage
 **********************
 
-In essence the DANE ecosystem consists of three parts, 1) The back-end (`DANE-core <https://github.com/CLARIAH/DANE-core/>`_), 2) The compute workers, 3) A client that submits the jobs. 
+In essence the DANE ecosystem consists of three parts, 1) The back-end (`DANE-server <https://github.com/CLARIAH/DANE-server/>`_), 2) The compute workers, 3) A client that submits the jobs. 
 The format of the communication between these components follows the :doc:`job specification <DANE/jobs>` format which details the source material to process, 
 the tasks to be performed, as well as information about the task results. 
 
 .. image:: https://docs.google.com/drawings/d/e/2PACX-1vRCjKm3O5cqbF5LRlUyC6icAbQ3xmedKvArlY_8h31PJqAu3iZe6Q5qcVbs3rujVoGpzesD00Ck9-Hw/pub?w=953&amp;h=438
 
-Once a job is submitted to DANE-core its tasks will be assigned to workers and executed in the order indicated in the job. As such, a worker relies on a DANE-core instance for 
-its task assignment. To use DANE, one thus needs all three parts, namely an instance of DANE-core, some compute workers, and some client or process to submit jobs. 
-Examples of workers and clients can be found :doc:`here <examples>`, whereas DANE-core is documented in its repository.
+Once a job is submitted to DANE-server its tasks will be assigned to workers and executed in the order indicated in the job. As such, a worker relies on a DANE-server instance for 
+its task assignment. To use DANE, one thus needs all three parts, namely an instance of DANE-server, some compute workers, and some client or process to submit jobs. 
+Examples of workers and clients can be found :doc:`here <examples>`, whereas DANE-server is documented in its repository.
 
 .. _states:
 

@@ -6,11 +6,11 @@ from DANE.utils import parse
 
 class Task():
     """Class representation of a task, contains job information and has logic
-    for interacting with DANE-core through a :class:`base_classes.base_handler`
+    for interacting with DANE-server through a :class:`base_classes.base_handler`
 
     :param task_key: Key of the task, should match a binding key of a worker
     :type task_key: str
-    :param task_id: id assigned by DANE-core to this task
+    :param task_id: id assigned by DANE-server to this task
     :type task_id: int, optional
     :param api: Reference to a :class:`base_classes.base_handler` which is
         used to communicate with the database, and queueing system.
@@ -32,7 +32,7 @@ class Task():
         self.api = api
 
     def register(self, job_id):
-        """Register this task with DANE-core, this will assign a task_id to the
+        """Register this task with DANE-server, this will assign a task_id to the
         task. Requires an API to be set.
         
         :return: self

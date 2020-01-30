@@ -18,7 +18,7 @@ class Job():
     :type source_set: str
     :param tasks: A specification of the tasks to be performed
     :type tasks: :class:`DANE.taskContainer` or :class:`DANE.Task`
-    :param job_id: ID of the job, assigned by DANE-core
+    :param job_id: ID of the job, assigned by DANE-server
     :type job_id: int, optional
     :param metadata: Dictionary containing metadata related to the job, or
         the source material

@@ -8,7 +8,7 @@ import functools
 class base_worker(ABC):
     """Abstract base class for a worker. 
 
-    This class contains most of the logic of dealing with DANE-core,
+    This class contains most of the logic of dealing with DANE-server,
     classes (workers) inheriting from this class only need to specific the
     callback method.
     
