@@ -35,7 +35,7 @@ class filesize_server():
 
     def simulate_request(self):
         job = DANE.Job(source_url=__file__, 
-            source_id='TEST', source_set='TEST',
+            source_id='TEST',
             tasks=DANE.taskSequential(['FILESIZE']))
 
         self.corr_id = str(uuid.uuid4())

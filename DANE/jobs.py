@@ -13,8 +13,7 @@ class Job():
     :type source_url: str
     :param source_id: Id of the source object within the source collection
     :type source_id: str
-    :param source_set: Identifier specifying the source collection the
-        material is from.
+    :param source_set: Deprecated parameter, will be removed in the future.
     :type source_set: str
     :param tasks: A specification of the tasks to be performed
     :type tasks: :class:`DANE.taskContainer` or :class:`DANE.Task`
@@ -32,12 +31,12 @@ class Job():
     :type api: :class:`base_classes.base_handler`, optional
     """
 
-    def __init__(self, source_url, source_id, source_set, tasks,
+    def __init__(self, source_url, source_id, tasks, source_set=None,
             job_id=None, metadata={}, priority=1, response={}, api=None):
         # TODO add more input validation
-        self.source_url = source_url
-        self.source_id = source_id
-        self.source_set = source_set
+        self.source_url = str(source_url)
+        self.source_id = str(source_id)
+        self.source_set = str(source_set)
         self.api = api
         self.job_id = job_id
 
@@ -57,7 +56,7 @@ class Job():
         return self.to_json()
 
     def to_json(self):
-        """Returns this job serialised as JSON
+        """Returns this job serialised as JSON, excluding the API reference.
 
         :return: JSON string of the job
         :rtype: str
@@ -67,7 +66,7 @@ class Job():
             if kw == 'tasks':
                 astr.append("\"tasks\" : {}".format(getattr(self, 
                     kw).to_json()))
-            elif kw == 'api':
+            elif kw == 'api' or kw == 'source_set':
                 continue
             else: 
                 astr.append("\"{}\" : {}".format(kw, 
@@ -95,8 +94,7 @@ class Job():
         :return: self
         """
         self.api = api
-        for t in self.tasks:
-            t.set_api(api)
+        self.tasks.set_api(api)
         return self
 
     def register(self):
@@ -117,8 +115,7 @@ class Job():
         self.response['SHARED'].update(self.api.get_dirs(job=self))
         self.job_id = self.api.register_job(job=self)
 
-        for t in self.tasks:
-            t.register(job_id=self.job_id)
+        self.tasks.register(job_id=self.job_id)
 
         self.api.propagate_task_ids(job=self)
         return self

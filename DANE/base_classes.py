@@ -287,13 +287,11 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def search(self, source_id, source_set=None):
+    def search(self, source_id):
         """Returns jobs which exist for this source material.
 
         :param source_id: The id of the source material
         :type source_id: int
-        :param source_set: Specific source material collection to search n
-        :type source_set: str, optional
         :return: ids of found jobs
         :rtype: dict
         """
