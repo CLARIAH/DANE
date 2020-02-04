@@ -90,7 +90,17 @@ class base_worker(ABC):
             self.thread.start()
 
     def _run(self, job, ch, method, props):
-        response = self.callback(job)
+        try:
+            response = self.callback(job)
+        except DANE.errors.RefuseJobException:
+            # worker doesnt want the job yet, nack it
+            nack = functools.partial(ch.basic_ack, 
+                    delivery_tag=method.delivery_tag)
+            self.connection.add_callback_threadsafe(nack)
+            return
+        except Exception as e:
+            response = { 'state': 500, 
+                    'message': 'Unhandled worker error: ' + str(e)}
 
         if not isinstance(response, str):
             response = json.dumps(response)
