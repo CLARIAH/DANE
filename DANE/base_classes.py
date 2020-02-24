@@ -190,6 +190,17 @@ class base_handler(ABC):
         :rtype: int
         """
         return
+
+    @abstractmethod
+    def taskFromTaskId(self, task_id):
+        """Retrieve task for a given task_id
+
+        :param task_id: id of the task
+        :type task_id: int
+        :return: the task, or error if it doesnt exist
+        :rtype: :class:`DANE.Task`
+        """
+        return
     
     @abstractmethod
     def getTaskState(self, task_id):
@@ -261,13 +272,17 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def retry(self, task_id):
-        """Retry the task with this id, and change its task state to `102`.
+    def retry(self, task_id, force=False):
+        """Retry the task with this id.
 
-        Attempts to run a task which previously might have crashed. 
+        Attempts to run a task which previously might have crashed. Defaults
+        to skipping tasks with state 200, or 102, unless Force is specified,
+        then it should rerun regardless of previous state.
         
         :param task_id: The id of a task
         :type task_id: int
+        :param force: Force task to rerun regardless of previous state
+        :type force: bool, optional
         """
         return
 
@@ -299,8 +314,8 @@ class base_handler(ABC):
 
     @abstractmethod
     def getUnfinished(self):
-        """Returns jobs which are not finished and not queue, i.e., not state
-        `102` or `200` 
+        """Returns jobs which are not finished and not in queue, i.e., 
+        jobs which dont have state `102` or `200` 
 
         :return: ids of found jobs
         :rtype: dict

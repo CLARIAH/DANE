@@ -19,9 +19,11 @@ class Task():
     :type task_state: int, optional
     :param task_msg: Textual message accompanying the state
     :type task_msg: str, optional
+    :param job_id: id of parent job, assigned by DANE-server to this task
+    :type job_id: int, optional
     """
     def __init__(self, task_key, task_id = None, api = None, 
-            task_state=None, task_msg=None):
+            task_state=None, task_msg=None, job_id = None):
         if task_key is None or task_key == '':
             raise ValueError("task key cannot be empty string \"\" or None")
 
@@ -30,6 +32,7 @@ class Task():
         self.task_state = task_state
         self.task_msg = task_msg
         self.api = api
+        self.job_id = job_id
 
     def register(self, job_id):
         """Register this task with DANE-server, this will assign a task_id to the
@@ -37,13 +40,14 @@ class Task():
         
         :return: self
         """
-        if self.task_id is not None:
+        if self.task_id is not None or self.job_id is not None:
             raise DANE.errors.APIRegistrationError('Task already registered')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found to'\
                     'register task')
 
         self.task_id = self.api.register(job_id=job_id, task=self)
+        self.job_id = job_id
         return self
 
     def run(self):
@@ -61,21 +65,42 @@ class Task():
         self.api.run(task_id = self.task_id)
         return self
 
-    def retry(self):
+    def retry(self, force=False):
         """Try to run this task again. Unlike 
         :func:`run` this will attempt to run even after  
         an error state was encountered.
         
+        :param force: Force task to rerun regardless of previous state
+        :type force: bool, optional
         :return: self
         """
         if self.task_id is None:
-            raise DANE.errors.APIRegistrationError('Cannot retry an unregistered'\
-                    'task')
+            raise DANE.errors.APIRegistrationError('Cannot retry an '\
+                    'unregistered task')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found'\
                     'to perform task')
 
-        self.api.retry(task_id = self.task_id)
+        self.api.retry(task_id = self.task_id, force=force)
+        return self
+
+    def refresh(self):
+        """Retrieves the latest information for task state and msg which might 
+        have changed their values since the creation of this task. Requires an 
+        API to be set
+
+        :return: self
+        """
+        if self.task_id is None:
+            raise DANE.errors.APIRegistrationError('Cannot refresh an '\
+                    'unregistered task')
+        elif self.api is None:
+            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+                    'refresh task')
+
+        task = self.api.taskFromTaskId(self.task_id)
+        self.task_state = task.task_state
+        self.task_msg = task.task_msg
         return self
 
     def isDone(self):
@@ -129,7 +154,8 @@ class Task():
         task_data = { "task_key": self.task_key.upper(),
                 "task_id": self.task_id,
                 "task_state": self.task_state,
-                "task_msg": self.task_msg}
+                "task_msg": self.task_msg,
+                "job_id": self.job_id}
 
         frmt = { k:v for k,v in task_data.items() if v is not None}
 
