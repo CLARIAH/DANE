@@ -156,6 +156,15 @@ class base_handler(ABC):
         return
 
     @abstractmethod
+    def delete_job(self, job):
+        """Delete a job and its underlying tasks from the database
+
+        :param job: The job
+        :type job: :class:`DANE.Job`
+        """
+        return
+
+    @abstractmethod
     def propagate_task_ids(self, job):
         """The task list is updated to include task_ids by the registration,
         propagate this change to the underlying database.
@@ -297,6 +306,24 @@ class base_handler(ABC):
         :type task_id: int
         :param response: Task response, should contain at least the `state`
             and a `message`
+        :type response: dict
+        """
+        return
+
+    @abstractmethod
+    def updateTaskState(self, task_id, state, message, response=True):        
+        """Update the state and message of a task.
+
+        if a response is supplied then it will be added to the job response 
+        dict.
+
+        :param task_id: The id of a task
+        :type task_id: int, required
+        :param state: The new task state
+        :type state: int, required
+        :param message: The new task message
+        :type message: string, required
+        :param response: Task response
         :type response: dict
         """
         return

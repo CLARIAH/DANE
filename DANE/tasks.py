@@ -84,6 +84,25 @@ class Task():
         self.api.retry(task_id = self.task_id, force=force)
         return self
 
+    def reset(self):
+        """Reset the task state to `201`
+
+        This can be used to force tasks to re-run after a preceding task
+        has completed. Typically, the preceding task will be retried with
+        `force=True`.
+        
+        :return: self
+        """
+        if self.task_id is None:
+            raise DANE.errors.APIRegistrationError('Cannot retry an '\
+                    'unregistered task')
+        elif self.api is None:
+            raise DANE.errors.MissingEndpointError('No endpoint found'\
+                    'to perform task')
+
+        self.api.updateTaskState(self.task_id, 201, 'Reset')
+        return self
+
     def refresh(self):
         """Retrieves the latest information for task state and msg which might 
         have changed their values since the creation of this task. Requires an 

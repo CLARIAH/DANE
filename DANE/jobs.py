@@ -120,6 +120,11 @@ class Job():
         self.api.propagate_task_ids(job=self)
         return self
 
+    def delete(self):
+        """Delete this job and any attached tasks. Requires an API to be set.
+        """
+        return self.api.delete_job(job=self)
+
     def refresh(self):
         """Retrieves the latest information for any fields that might have
         changed their values since the creation of this job. Requires an API
