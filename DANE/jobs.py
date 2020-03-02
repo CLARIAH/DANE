@@ -40,6 +40,9 @@ class Job():
         self.api = api
         self.job_id = job_id
 
+        if len(self.source_url) < 1 or len(self.source_id) < 1:
+            raise ValueError('Source url and id required')
+
         if isinstance(tasks, str) or isinstance(tasks, dict):
             tasks = parse(tasks)
         elif not isinstance(tasks, DANE.taskContainer):

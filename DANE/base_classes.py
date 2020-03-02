@@ -341,8 +341,8 @@ class base_handler(ABC):
 
     @abstractmethod
     def getUnfinished(self):
-        """Returns jobs which are not finished and not in queue, i.e., 
-        jobs which dont have state `102` or `200` 
+        """Returns jobs which are not finished, i.e., 
+        jobs which have tasks that dont have state `200` 
 
         :return: ids of found jobs
         :rtype: dict
