@@ -311,7 +311,7 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def updateTaskState(self, task_id, state, message, response=True):        
+    def updateTaskState(self, task_id, state, message, response=None):        
         """Update the state and message of a task.
 
         if a response is supplied then it will be added to the job response 

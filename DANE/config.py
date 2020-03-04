@@ -37,8 +37,11 @@ cfg.CUDA.VISIBLE_DEVICES = '1'
 if os.path.exists(os.path.join(cfg.DANE.HOME_DIR, "config.yml")):
     cfg.merge_from_file(os.path.join(cfg.DANE.HOME_DIR, "config.yml"))
 
-# Does the local dir have a config with additional param?
-# NOTE: global conf can overwrite the local dir, in case one might need that
+# Does the local dir have a base_config with additional param?
+if os.path.exists(os.path.join(cfg.DANE.LOCAL_DIR, "base_config.yml")):
+    cfg.merge_from_file(os.path.join(cfg.DANE.LOCAL_DIR, "base_config.yml"))
+
+# Does the local dir have a config with specific param?
 if os.path.exists(os.path.join(cfg.DANE.LOCAL_DIR, "config.yml")):
     cfg.merge_from_file(os.path.join(cfg.DANE.LOCAL_DIR, "config.yml"))
 

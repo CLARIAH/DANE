@@ -69,20 +69,32 @@ or we can retrieve specific values from the config.
 
     print('The DANE API is available at', cfg.DANE.API_URL)
 
-During the loading of the module, the default configuration will be constructed, subsequently DANE.config will try to load the system-wide config file, and then the
-component specific config file. By loading these in this order, the most specific options will be used (i.e., system-wide overrides defaults, and component specific
+During the loading of the module, the default configuration will be constructed, subsequently DANE.config will try to load the system-wide config file, then the
+component specific config file, and finally the instance specific config. By loading these in this order, 
+the most specific options will be used (i.e., system-wide overrides defaults, and component specific
 overrides system-wide and defaults both). DANE.config will look for the system-wide config at :code:`$HOME/.dane/config.yml` (or :code:`$DANE_HOME/config.yml` if available).
 
-For the component specific config DANE.config looks in the directory, of importing component, for a `config.yml`, it expects a directory structure akin to:
+For the component specific config DANE.config looks in the directory of the importing component, for a `base_config.yml`, and it also looks for an optional instance 
+specific config `config.yml`. It expects a directory structure akin to:
 
 .. code-block:: 
 
     filesize_worker/
         filesize_worker.py
+        base_config.yml
         config.yml
 
 A nice feature of YACS is that it is not necessary to specify all configuration options, we only need to specific the ones we would like to change or add. For the 
-filesize_worker, the config.yml might thus look like this:
+filesize_worker, the base_config.yml might thus look like this:
+
+.. code-block:: yaml
+
+    FILESIZE_WORKER:
+        UNIT: 'KB'
+        PRECISION: 2
+
+Defining new (non-functional) options for the worker, namely the units in which the filesize should be expressed, and the number of decimals we want shown in the output. 
+It also gives a default value for this option. Subsequently, we can define an instance specific config.yml (which shouldn't be committed to GIT), which contains the following options.
 
 .. code-block:: yaml
 
@@ -91,7 +103,8 @@ filesize_worker, the config.yml might thus look like this:
     FILESIZE_WORKER:
         UNIT: 'MB'
 
-This indicates that the API can be found at a different URL than the default one, and that we want the file size expressed in MB.
+This indicates that the API can be found at a different URL than the default one, and that we want the file size expressed in MB, for all other config options we
+rely on the previously defined defaults.
 
 .. _states:
 

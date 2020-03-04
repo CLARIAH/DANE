@@ -7,4 +7,7 @@ setup(name='DANE',
       url='https://github.com/CLARIAH/DANE',
       author='Nanne van Noord',
       author_email='n.j.e.vannoord@uva.nl',
-      packages=['DANE'])
+      packages=['DANE'],
+      install_requires=[
+          'yacs',
+      ])

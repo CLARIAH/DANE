@@ -9,8 +9,12 @@ class DummyHandler(base_handler):
 
     def register_job(self, job):
         idx = str(uuid.uuid4())
+        job.job_id = idx
         self.job_register[idx] = job
         return idx
+
+    def delete_job(self, job):
+        del self.job_register[job.job_id]
 
     def propagate_task_ids(self, job):
         self.job_register[job.job_id] = job
@@ -25,11 +29,14 @@ class DummyHandler(base_handler):
                     'Register job first')
         return idx
 
+    def taskFromTaskId(self, task_id):
+        return self.task_register[task_id]
+
     def getTaskState(self, task_id):
-        return self.task_register[task_id][1]
+        return self.taskFromTaskId(task_id)[1]
 
     def getTaskKey(self, task_id):
-        return self.task_register[task_id][0]
+        return self.taskFromTaskId(task_id)[0]
 
     def jobFromJobId(self, job_id):
         return self.job_register[job_id] 
@@ -58,6 +65,10 @@ class DummyHandler(base_handler):
             'TEMP_FOLDER': './',
             'OUT_FOLDER': './'
         }
+
+    def updateTaskState(self, task_id, state, message, response=None):        
+        _, _, job_id = self.task_register[task_id]
+        self.task_register[task_id] = (state, message, job_id)
 
     def search(self, source_id, source_set=None):
         return
