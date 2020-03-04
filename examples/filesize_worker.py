@@ -1,6 +1,7 @@
-import DANE
+import DANE.base_classes
 from os.path import getsize, exists
 import json
+from DANE.config import cfg
 
 class filesize_worker(DANE.base_classes.base_worker):
     # we specify a queue name because every worker of this type should 
@@ -26,17 +27,8 @@ class filesize_worker(DANE.base_classes.base_worker):
                 'message': 'No file found at source_url'})
 
 if __name__ == '__main__':
-    config = {
-        'RABBITMQ' : {
-            'host': 'localhost',
-            'exchange': 'DANE-exchange',
-            'port': 5672,
-            'user': 'guest',
-            'password': 'guest'
-        }
-    }
 
-    fsw = filesize_worker(config)
+    fsw = filesize_worker(cfg)
     print(' # Initialising worker. Ctrl+C to exit')
 
     try: 

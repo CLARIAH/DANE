@@ -26,12 +26,12 @@ class base_worker(ABC):
         self.binding_key = binding_key
 
         self.config = config
-        self.host = config['RABBITMQ']['host']
-        self.port = config['RABBITMQ']['port']
-        self.exchange = config['RABBITMQ']['exchange']
+        self.host = config.RABBITMQ.HOST
+        self.port = config.RABBITMQ.PORT
+        self.exchange = config.RABBITMQ.EXCHANGE
 
-        user = config['RABBITMQ']['user']
-        password = config['RABBITMQ']['password']
+        user = config.RABBITMQ.USER
+        password = config.RABBITMQ.PASSWORD
 
         credentials = pika.PlainCredentials(user, password)
         self.connection = pika.BlockingConnection(

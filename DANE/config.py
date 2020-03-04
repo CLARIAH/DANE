@@ -1,5 +1,7 @@
 from yacs.config import CfgNode as CN
-import os
+import os, sys
+
+__all__ = ["cfg"]
 
 cfg = CN()
 
@@ -10,7 +12,12 @@ if 'DANE_HOME' in os.environ.keys():
     cfg.DANE.HOME_DIR = os.path.join(os.environ['DANE_HOME'], '')
 else:
     cfg.DANE.HOME_DIR = os.path.join(os.environ['HOME'], ".DANE", '')
-cfg.DANE.LOCAL_DIR = os.path.join(os.getcwd(), '')
+
+# cwd might not be same as dir where the file being called is in, resolve this
+xdir, _ = os.path.split(os.path.abspath(
+        os.path.join(os.getcwd(), sys.argv[0])))
+
+cfg.DANE.LOCAL_DIR = os.path.join(xdir, '')
 cfg.DANE.API_URL = 'http://localhost:5500/DANE/' # URL the api can be reached at
 cfg.DANE.MANAGE_URL = 'http://localhost:5500/manage/'
 

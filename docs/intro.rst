@@ -25,6 +25,74 @@ Once a job is submitted to DANE-server its tasks will be assigned to workers and
 its task assignment. To use DANE, one thus needs all three parts, namely an instance of DANE-server, some compute workers, and some client or process to submit jobs. 
 Examples of workers and clients can be found :doc:`here <examples>`, whereas DANE-server is documented in its repository.
 
+.. _config:
+
+Configuration
+**********************
+
+The configuration of DANE components is done through the `DANE.config <https://github.com/CLARIAH/DANE/blob/master/DANE/config.py>`_ module, 
+which builds on top of `YACS <https://github.com/rbgirshick/yacs>`_. The DANE.config specifies some default options, with default values, but
+it is mainly meant to be extended with component specific options. YACS makes it possible to specify configurations in a yaml format, and in code,
+here is a yaml example with some of the default config options:
+
+.. code-block:: yaml
+
+    DANE:
+      HOST: '0.0.0.0'
+      PORT: 5500
+      API_URL: 'http://localhost:5500/DANE/'
+    RABBITMQ:
+      HOST: 'localhost'
+      PORT: 5672
+      EXCHANGE: 'DANE-exchange'
+
+Here, we have specified that the host that the DANE server listens on is `0.0.0.0` with port `5500`, additionally, the url at which the API is reachable is
+given by the `API_URL` field. Similarly, we specify a number of options for the RabbitMQ queueing system.
+
+To deviate from the default options there are two options, 1) the system-wide DANE config file, and 2) the component specific config file. To best illustrate how
+these are used we will first demonstrate how to get access to the config. The DANE.config module has an cfg object, which is a YACS config node, which we can get access to
+by importing it as follows:
+
+.. code-block:: python
+
+    from DANE.config import cfg
+
+We now have access to the config, and then we can pass it for example to a worker (as shown in the :doc:`examples`):
+
+.. code-block:: python
+
+    fsw = filesize_worker(cfg)
+
+or we can retrieve specific values from the config.
+
+.. code-block:: python
+
+    print('The DANE API is available at', cfg.DANE.API_URL)
+
+During the loading of the module, the default configuration will be constructed, subsequently DANE.config will try to load the system-wide config file, and then the
+component specific config file. By loading these in this order, the most specific options will be used (i.e., system-wide overrides defaults, and component specific
+overrides system-wide and defaults both). DANE.config will look for the system-wide config at :code:`$HOME/.dane/config.yml` (or :code:`$DANE_HOME/config.yml` if available).
+
+For the component specific config DANE.config looks in the directory, of importing component, for a `config.yml`, it expects a directory structure akin to:
+
+.. code-block:: 
+
+    filesize_worker/
+        filesize_worker.py
+        config.yml
+
+A nice feature of YACS is that it is not necessary to specify all configuration options, we only need to specific the ones we would like to change or add. For the 
+filesize_worker, the config.yml might thus look like this:
+
+.. code-block:: yaml
+
+    DANE:
+      API_URL: 'http://somehost.ext:5500/DANE/'
+    FILESIZE_WORKER:
+        UNIT: 'MB'
+
+This indicates that the API can be found at a different URL than the default one, and that we want the file size expressed in MB.
+
 .. _states:
 
 Task states

@@ -108,17 +108,8 @@ Lastly, we need some code to start the worker.
 .. code-block:: python
 
     if __name__ == '__main__':
-        config = {
-            'RABBITMQ' : {
-                'host': 'localhost',
-                'exchange': 'DANE-exchange',
-                'port': 5672,
-                'user': 'guest',
-                'password': 'guest'
-            }
-        }
 
-        fsw = filesize_worker(config)
+        fsw = filesize_worker(cfg)
         print(' # Initialising worker. Ctrl+C to exit')
 
         try: 
@@ -127,9 +118,11 @@ Lastly, we need some code to start the worker.
             fsw.stop()
 
 To start a worker, we first initialise it with a config file. By default
-a worker only needs access to the RabbitMQ details, such that it can
+a worker only needs access to the RabbitMQ details provided by the DANE.config, 
+such that it can
 set up a queue and listen to work to perform. However, this can be extended
-with worker specific configuration options.
+with worker specific configuration options. More details on how to work with
+the configuration can be found in the :ref:`Usage <config>` guide.
 
 After having initialised the worker we can simply call the :func:`DANE.base_classes.base_worker.run()`
 method to start listening for work. As this starts a blocking process, we have
