@@ -34,10 +34,10 @@ class Job():
     def __init__(self, source_url, source_id, tasks, source_set=None,
             job_id=None, metadata={}, priority=1, response={}, api=None):
         # TODO add more input validation
-        self.source_url = str(source_url)
-        self.source_id = str(source_id)
-        self.source_set = str(source_set)
-        self.api = api
+        self.source_url = str(source_url).strip()
+        self.source_id = str(source_id).strip()
+        self.source_set = str(source_set).strip()
+        self.api = api.strip()
         self.job_id = job_id
 
         if len(self.source_url) < 1 or len(self.source_id) < 1:

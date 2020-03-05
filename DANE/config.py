@@ -3,9 +3,9 @@ import os, sys
 
 __all__ = ["cfg"]
 
-cfg = CN()
+cfg = CN(new_allowed=True)
 
-cfg.DANE = CN()
+cfg.DANE = CN(new_allowed=True)
 cfg.DANE.HOST = '0.0.0.0' # host we listen on
 cfg.DANE.PORT = 5500
 if 'DANE_HOME' in os.environ.keys():
@@ -14,8 +14,7 @@ else:
     cfg.DANE.HOME_DIR = os.path.join(os.environ['HOME'], ".DANE", '')
 
 # cwd might not be same as dir where the file being called is in, resolve this
-xdir, _ = os.path.split(os.path.abspath(
-        os.path.join(os.getcwd(), sys.argv[0])))
+xdir, _ = os.path.split(os.path.join(os.getcwd(), sys.argv[0]))
 
 cfg.DANE.LOCAL_DIR = os.path.join(xdir, '')
 cfg.DANE.API_URL = 'http://localhost:5500/DANE/' # URL the api can be reached at
@@ -29,8 +28,8 @@ cfg.RABBITMQ.RESPONSE_QUEUE = 'DANE-response-queue'
 cfg.RABBITMQ.USER = 'guest'
 cfg.RABBITMQ.PASSWORD = 'guest'
 
-cfg.CUDA = CN()
-cfg.CUDA.VISIBLE_DEVICES = '1'
+cfg.CUDA = CN(new_allowed=True)
+cfg.CUDA.VISIBLE_DEVICES = None
 
 # Does the home dir have a config with additional param?
 # Add them. Or override defaults defined here
