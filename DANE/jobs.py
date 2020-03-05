@@ -37,7 +37,7 @@ class Job():
         self.source_url = str(source_url).strip()
         self.source_id = str(source_id).strip()
         self.source_set = str(source_set).strip()
-        self.api = api.strip()
+        self.api = api
         self.job_id = job_id
 
         if len(self.source_url) < 1 or len(self.source_id) < 1:
