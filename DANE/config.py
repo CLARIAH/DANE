@@ -29,7 +29,7 @@ cfg.RABBITMQ.USER = 'guest'
 cfg.RABBITMQ.PASSWORD = 'guest'
 
 cfg.CUDA = CN(new_allowed=True)
-cfg.CUDA.VISIBLE_DEVICES = None
+cfg.CUDA.VISIBLE_DEVICES = '1'
 
 # Does the home dir have a config with additional param?
 # Add them. Or override defaults defined here
