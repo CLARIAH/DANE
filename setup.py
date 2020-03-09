@@ -10,4 +10,5 @@ setup(name='DANE',
       packages=['DANE'],
       install_requires=[
           'yacs',
+          'pika',
       ])
