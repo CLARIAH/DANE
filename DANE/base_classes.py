@@ -20,18 +20,28 @@ class base_worker(ABC):
     :type binding_key: str or list
     :param config: Config settings of the worker
     :type config: dict
+    :param auto_connect: Connect to AMQ on init, set to false to debug worker
+        as a standalone class.
+    :type auto_connect: bool, optional
     """
-    def __init__(self, queue, binding_key, config):
+    def __init__(self, queue, binding_key, config, auto_connect=True):
         self.queue = queue
         self.binding_key = binding_key
 
         self.config = config
-        self.host = config.RABBITMQ.HOST
-        self.port = config.RABBITMQ.PORT
-        self.exchange = config.RABBITMQ.EXCHANGE
+        self.connected = False
+        if auto_connect:
+            self.connect()
 
-        user = config.RABBITMQ.USER
-        password = config.RABBITMQ.PASSWORD
+    def connect(self):
+        """Connect the worker to the AMQ. Called by init if autoconnecting.
+        """
+        self.host = self.config.RABBITMQ.HOST
+        self.port = self.config.RABBITMQ.PORT
+        self.exchange = self.config.RABBITMQ.EXCHANGE
+
+        user = self.config.RABBITMQ.USER
+        password = self.config.RABBITMQ.PASSWORD
 
         credentials = pika.PlainCredentials(user, password)
         self.connection = pika.BlockingConnection(
@@ -59,16 +69,23 @@ class base_worker(ABC):
         self.channel.basic_consume(on_message_callback=self._callback, 
                                    auto_ack=False,
                                    queue=self.queue)
+        self.connected = True
 
     def run(self):
         """Start listening for tasks to be executed.
         """
-        self.channel.start_consuming()
+        if self.connected:
+            self.channel.start_consuming()
+        else:
+            raise DANE.errors.ResourceConnectionError('Not connected to AMQ')
 
     def stop(self):
         """Stop listening for tasks to be executed.
         """
-        self.channel.stop_consuming()
+        if self.connected:
+            self.channel.stop_consuming()
+        else:
+            raise DANE.errors.ResourceConnectionError('Not connected to AMQ')
 
     def _callback(self, ch, method, props, body):
         try:
