@@ -111,7 +111,7 @@ class base_worker(ABC):
             response = self.callback(job)
         except DANE.errors.RefuseJobException:
             # worker doesnt want the job yet, nack it
-            nack = functools.partial(ch.basic_ack, 
+            nack = functools.partial(ch.basic_nack, 
                     delivery_tag=method.delivery_tag)
             self.connection.add_callback_threadsafe(nack)
             return
