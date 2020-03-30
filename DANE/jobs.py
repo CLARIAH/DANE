@@ -183,3 +183,11 @@ class Job():
         :rtype: bool
         """
         return self.tasks.isDone()
+
+    def state(self):
+        """Get state of furthest along task.
+
+        :return: State of task
+        :rtype: int 
+        """
+        return self.tasks.state()

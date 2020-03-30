@@ -68,6 +68,19 @@ class taskContainer(ABC):
                 return False
         return True
 
+    def state(self):
+        """Get state of furthest along task.
+
+        :return: State of task
+        :rtype: int
+        """
+        for task in self:
+            if not task.isDone():
+                # encountered a task that isnt done, return its state
+                return task.state()
+        # All child tasks are done, so this container is done
+        return 200
+
     def set_api(self, api):
         """Set the API for itself, and all underlying tasks
 

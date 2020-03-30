@@ -143,6 +143,24 @@ class Task():
 
         return self.api.isDone(task_id = self.task_id)
 
+    def state(self):
+        """ Get task state of this job. 
+
+        :return: Task state 
+        :rtype: int
+        """
+        if self.task_state is not None:
+            return self.task_state
+
+        if self.task_id is None:
+            raise DANE.errors.APIRegistrationError('Cannot get state of an'\
+                    'unregistered task')
+        elif self.api is None:
+            raise DANE.errors.MissingEndpointError('No endpoint found to get'\
+                    'task state from')
+
+        return self.api.getTaskState(task_id = task_id)
+
     def set_api(self, api):
         """Set the API for this task
 
