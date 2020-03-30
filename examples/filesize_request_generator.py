@@ -42,7 +42,7 @@ class filesize_server():
         self.corr_id = str(uuid.uuid4())
         self.channel.basic_publish(
             exchange=self.config.EXCHANGE,
-            routing_key='plaintext.filesize',
+            routing_key='plaintext.FILESIZE',
             properties=pika.BasicProperties(
                 reply_to='response_queue',
                 correlation_id=self.corr_id,
