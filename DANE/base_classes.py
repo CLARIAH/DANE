@@ -29,7 +29,7 @@ class base_worker(ABC):
         self.binding_key = binding_key
 
         self.config = config
-        self.connected = False
+        self._connected = False
         if auto_connect:
             self.connect()
 
@@ -66,24 +66,27 @@ class base_worker(ABC):
                 routing_key=bk)
 
         self.channel.basic_qos(prefetch_count=1)
-        self.channel.basic_consume(on_message_callback=self._callback, 
-                                   auto_ack=False,
-                                   queue=self.queue)
-        self.connected = True
+        self._connected = True
+        self._is_interrupted = False
 
     def run(self):
         """Start listening for tasks to be executed.
         """
-        if self.connected:
-            self.channel.start_consuming()
+        if self._connected:
+            for method, props, body in self.channel.consume(self.queue, inactivity_timeout=1):
+                if self._is_interrupted or not self._connected:
+                    break
+                if not method:
+                    continue
+                self._callback(self.channel, method, props, body)
         else:
             raise DANE.errors.ResourceConnectionError('Not connected to AMQ')
 
     def stop(self):
         """Stop listening for tasks to be executed.
         """
-        if self.connected:
-            self.channel.stop_consuming()
+        if self._connected:
+            self._is_interrupted = True
         else:
             raise DANE.errors.ResourceConnectionError('Not connected to AMQ')
 

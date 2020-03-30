@@ -1,8 +1,9 @@
+dist/
+build/
 DS_Store
 *.pyc
 *.swp
 config.yml
-dist/
 *.egg-info
 docs/_build/
 .ipynb_checkpoints/
