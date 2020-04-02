@@ -38,3 +38,8 @@ class RefuseJobException(Exception):
     causing the job to be requeued (at the or close to the head of the queue).
     """
     pass
+
+class ConfigRequiredError(Exception):
+    """Error to indicate that the base_config.yml is declared abstract,
+    and that it requires a config.yml.
+    """

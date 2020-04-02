@@ -14,7 +14,9 @@
 ##############################################################################
 
 from yacs.config import CfgNode as CN
-import os, sys
+import os, sys, inspect
+import inspect
+import DANE.errors as errors
 
 __all__ = ["cfg"]
 
@@ -29,9 +31,8 @@ else:
     cfg.DANE.HOME_DIR = os.path.join(os.environ['HOME'], ".DANE", '')
 
 # cwd might not be same as dir where the file being called is in, resolve this
-xdir, _ = os.path.split(os.path.join(os.getcwd(), sys.argv[0]))
+# xdir, _ = os.path.split(os.path.join(os.getcwd(), sys.argv[0]))
 
-cfg.DANE.LOCAL_DIR = os.path.join(xdir, '')
 cfg.DANE.API_URL = 'http://localhost:5500/DANE/' # URL the api can be reached at
 cfg.DANE.MANAGE_URL = 'http://localhost:5500/manage/'
 
@@ -46,18 +47,36 @@ cfg.RABBITMQ.PASSWORD = 'guest'
 cfg.CUDA = CN(new_allowed=True)
 cfg.CUDA.VISIBLE_DEVICES = '1'
 
+cfg.CONFIG = CN(new_allowed=False)
+# If a base.config.yml sets this to true, then a config.yml is required
+cfg.CONFIG.REQUIRED = False
+
 # Does the home dir have a config with additional param?
 # Add them. Or override defaults defined here
 if os.path.exists(os.path.join(cfg.DANE.HOME_DIR, "config.yml")):
     cfg.merge_from_file(os.path.join(cfg.DANE.HOME_DIR, "config.yml"))
 
-# Does the local dir have a base_config with additional param?
-if os.path.exists(os.path.join(cfg.DANE.LOCAL_DIR, "base_config.yml")):
-    cfg.merge_from_file(os.path.join(cfg.DANE.LOCAL_DIR, "base_config.yml"))
+# Does the file that is importing this, have a base_config.yml in its dir?
+stack = [s for s in inspect.stack() if s.index is not None]
+if len(stack) > 1:
+    importing_path, _ = os.path.split(os.path.abspath(stack[1].filename))
+else:
+    # Import happening on CLI, so use cwd
+    importing_path = os.getcwd()
 
-# Does the local dir have a config with specific param?
-if os.path.exists(os.path.join(cfg.DANE.LOCAL_DIR, "config.yml")):
-    cfg.merge_from_file(os.path.join(cfg.DANE.LOCAL_DIR, "config.yml"))
+if os.path.exists(os.path.join(importing_path, "base_config.yml")):
+    cfg.merge_from_file(os.path.join(importing_path, "base_config.yml"))
+
+# Does the cwd have a config with specific param?
+if os.path.exists(os.path.join(os.getcwd(), "config.yml")):
+    cfg.merge_from_file(os.path.join(os.getcwd(), "config.yml"))
+elif cfg.CONFIG.REQUIRED:
+    # base_config has indicated it requires a config.yml
+    # as it wont or shouldnt run with default parameters.
+    raise errors.ConfigRequiredError(
+    "A config.yml is required that configures this component. " \
+    "Please refer to https://dane.readthedocs.io/en/latest/intro.html#configuration "\
+    "for more information.")
 
 # make immutable
 cfg.freeze()

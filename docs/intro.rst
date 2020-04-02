@@ -69,23 +69,27 @@ or we can retrieve specific values from the config.
 
     print('The DANE API is available at', cfg.DANE.API_URL)
 
-During the loading of the module, the default configuration will be constructed, subsequently DANE.config will try to load the system-wide config file, then the
-component specific config file, and finally the instance specific config. By loading these in this order, 
-the most specific options will be used (i.e., system-wide overrides defaults, and component specific
-overrides system-wide and defaults both). DANE.config will look for the system-wide config at :code:`$HOME/.dane/config.yml` (or :code:`$DANE_HOME/config.yml` if available).
+During the loading of the config module, the default configuration will be constructed. Once the default config is setup
+it will, in order, search for a system-wide config, a component specific 'base_config', and a runtime specific config.
+By loading these in this order, the most specific options will be used (i.e., system-wide overrides defaults, and component specific
+overrides both the system-wide and defaults settings). 
+DANE.config will look for the system-wide config at :code:`$HOME/.dane/config.yml` (or :code:`$DANE_HOME/config.yml` if available).
 
-For the component specific config DANE.config looks in the directory of the importing component, for a `base_config.yml`, and it also looks for an optional instance 
-specific config `config.yml`. It expects a directory structure akin to:
+For the component specific config DANE.config looks in the directory of file that is importing it for a `base_config.yml`, thus if the 
+module which uses DANE.config is at `$PYTHONLIB/site-packages/mymodule` then it will look in that same directory for the `base_config.yml`. 
 
-.. code-block:: 
+Lastly, the config module will look for the component specific config (`config.yml`) in the current working directory. For a worker, simply
+consist of a directory of code, and which is not installed, the directory structure might thus look like this:
+
+.. code-block:: none
 
     filesize_worker/
         filesize_worker.py
         base_config.yml
         config.yml
 
-A nice feature of YACS is that it is not necessary to specify all configuration options, we only need to specific the ones we would like to change or add. For the 
-filesize_worker, the base_config.yml might thus look like this:
+A nice feature of YACS is that it is not necessary to overwrite all default configuration options, 
+we only need to specific the ones we would like to change or add. For the filesize_worker, the base_config.yml might thus look like this:
 
 .. code-block:: yaml
 
@@ -105,6 +109,17 @@ It also gives a default value for this option. Subsequently, we can define an in
 
 This indicates that the API can be found at a different URL than the default one, and that we want the file size expressed in MB, for all other config options we
 rely on the previously defined defaults.
+
+However, in some cases it might be necessary that the user always overwrites the base config, for instance when it contains paths that
+might be environment specific. In this case we can require that a `config.yml` is found by including the following in the base config:
+
+
+.. code-block:: yaml
+
+    CONFIG:
+      REQUIRED: True
+
+If no `config.yml` is found but the base config has indicated its required the config module will raise a `DANE.errors.ConfigRequiredError`.
 
 .. _states:
 
