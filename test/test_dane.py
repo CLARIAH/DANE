@@ -66,17 +66,6 @@ class TestConfig(unittest.TestCase):
         self.assertIsInstance(cfg, CfgNode)
         self.assertIsInstance(cfg.DANE, CfgNode)
 
-    def test_base_config(self):
-        with open('base_config.yml', 'w') as f:
-            f.write('TEST:\n')
-            f.write('  SCOPE: "BASE"\n')
-
-        reload(DANE.config)
-        cfg = DANE.config.cfg
-
-        self.assertIsInstance(cfg.TEST, CfgNode)
-        self.assertEqual(cfg.TEST.SCOPE, "BASE")
-
     def test_local_config(self):
         with open('config.yml', 'w') as f:
             f.write('TEST:\n')
