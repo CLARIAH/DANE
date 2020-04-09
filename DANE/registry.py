@@ -52,7 +52,9 @@ class Registry():
             method = 'PUT'
             url = urljoin(url, entry.registry_id)
 
-        resp = requests.request(method, url, json=entry.to_json())
+        resp = requests.request(method, url, 
+                json=entry.to_json(), params={'cid': self.user,
+                    'at': self.token})
         if resp.status_code == 200:
             return resp.json()
         else:
@@ -68,7 +70,8 @@ class Registry():
         """
         url = urljoin(self.annotation_api, 'annotation', registry_id)
 
-        resp = requests.request("GET", url)
+        resp = requests.request("GET", url, params={'cid': self.user,
+                    'at': self.token})
         if resp.status_code == 200:
             return RegistryEntry.from_json(resp.json())
         else:
@@ -85,7 +88,8 @@ class Registry():
         """
         if entry.registry_id is not None:
             url = urljoin(self.annotation_api, 'annotation', entry.registry_id)
-            resp = requests.request("DELETE", url)
+            resp = requests.request("DELETE", url, params={'cid': self.user,
+                    'at': self.token})
             if resp.status_code == 200:
                 return True
             else:
