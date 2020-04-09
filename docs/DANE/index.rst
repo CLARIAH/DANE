@@ -10,5 +10,6 @@ API stuff
     taskcontainers
     jobs
     base_classes
+    registry
     utils
     errors

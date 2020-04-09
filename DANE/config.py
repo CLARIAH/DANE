@@ -51,6 +51,13 @@ cfg.CONFIG = CN(new_allowed=False)
 # If a base.config.yml sets this to true, then a config.yml is required
 cfg.CONFIG.REQUIRED = False
 
+cfg.REGISTRY = CN(new_allowed=False)
+cfg.REGISTRY.TOKEN = ''
+cfg.REGISTRY.API = 'http://localhost/annotation_api'
+cfg.REGISTRY.USER = 'dane'
+cfg.REGISTRY.ENABLED = False # registry off by default
+cfg.REGISTRY.DATASTORE = './'
+
 # Does the home dir have a config with additional param?
 # Add them. Or override defaults defined here
 if os.path.exists(os.path.join(cfg.DANE.HOME_DIR, "config.yml")):
