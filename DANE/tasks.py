@@ -17,67 +17,86 @@ import json
 import sys
 from abc import ABC, abstractmethod
 import DANE.errors
-from DANE.utils import parse
+from collections.abc import Iterable
 
 class Task():
-    """Class representation of a task, contains job information and has logic
+    """Class representation of a task, contains task information and has logic
     for interacting with DANE-server through a :class:`base_classes.base_handler`
 
-    :param task_key: Key of the task, should match a binding key of a worker
-    :type task_key: str
-    :param task_id: id assigned by DANE-server to this task
-    :type task_id: int, optional
+    :param key: Key of the task, should match a binding key of a worker
+    :type key: str
+    :param _id: id assigned by DANE-server to this task
+    :type _id: int, optional
     :param api: Reference to a :class:`base_classes.base_handler` which is
         used to communicate with the database, and queueing system.
     :type api: :class:`base_classes.base_handler`, optional
-    :param task_state: Status code representing task state
-    :type task_state: int, optional
-    :param task_msg: Textual message accompanying the state
-    :type task_msg: str, optional
-    :param job_id: id of parent job, assigned by DANE-server to this task
-    :type job_id: int, optional
+    :param state: Status code representing task state
+    :type state: int, optional
+    :param msg: Textual message accompanying the state
+    :type msg: str, optional
+    :param **kwargs: Arbitrary keyword arguments. Will be stored in task.args 
     """
-    def __init__(self, task_key, task_id = None, api = None, 
-            task_state=None, task_msg=None, job_id = None):
-        if task_key is None or task_key == '':
+    def __init__(self, key, priority=1, _id = None, api = None, 
+            state=None, msg=None, **kwargs):
+        if key is None or key == '':
             raise ValueError("task key cannot be empty string \"\" or None")
 
-        self.task_key = task_key.upper()
-        self.task_id = task_id
-        self.task_state = task_state
-        self.task_msg = task_msg
+        self.key = key.upper()
+        self.priority = max(0, min(int(priority), 10))
+        self._id = _id
+        self.state = state
+        self.msg = msg
         self.api = api
-        self.job_id = job_id
+        if len(kwargs) == 1 and list(kwargs.keys())[0] == 'args':
+            self.args = kwargs['args']
+        else:
+            self.args = kwargs
 
-    def register(self, job_id):
-        """Register this task with DANE-server, this will assign a task_id to the
+    def assign(self, document_id):
+        """Assign a task to a document, this will set an _id for the
         task. Requires an API to be set.
         
         :return: self
         """
-        if self.task_id is not None or self.job_id is not None:
-            raise DANE.errors.APIRegistrationError('Task already registered')
+        if self._id is not None:
+            raise DANE.errors.APIRegistrationError('Task already assigned')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found to'\
-                    'register task')
+                    ' assign task')
 
-        self.task_id = self.api.register(job_id=job_id, task=self)
-        self.job_id = job_id
+        self = self.api.assignTask(task=self, document_id=document_id)
         return self
+
+    def assignMany(self, document_ids):
+        """Assign this task to multiple documents. Requires an API to be set.
+        """
+        if self._id is not None:
+            raise DANE.errors.APIRegistrationError('Cannot call assignMany'\
+                    ' on an assigned task')
+        elif self.api is None:
+            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+                    ' assign task')
+
+        if not isinstance(document_ids, Iterable) \
+                or isinstance(document_ids, str):
+            raise TypeError('document_ids must be iterable')
+
+        for d_id in document_ids:
+            self.api.assignTask(task=self, document_id=d_id)
 
     def run(self):
         """Run this task, requires it to be registered
         
         :return: self
         """
-        if self.task_id is None:
-            raise DANE.errors.APIRegistrationError('Cannot run an unregistered'\
+        if self._id is None:
+            raise DANE.errors.APIRegistrationError('Cannot run an unassigned'\
                     'task')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found'\
                     'to perform task')
 
-        self.api.run(task_id = self.task_id)
+        self.api.run(task_id = self._id)
         return self
 
     def retry(self, force=False):
@@ -89,14 +108,14 @@ class Task():
         :type force: bool, optional
         :return: self
         """
-        if self.task_id is None:
+        if self._id is None:
             raise DANE.errors.APIRegistrationError('Cannot retry an '\
-                    'unregistered task')
+                    'unassigned task')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found'\
                     'to perform task')
 
-        self.api.retry(task_id = self.task_id, force=force)
+        self.api.retry(task_id = self._id, force=force)
         return self
 
     def reset(self):
@@ -108,14 +127,14 @@ class Task():
         
         :return: self
         """
-        if self.task_id is None:
+        if self._id is None:
             raise DANE.errors.APIRegistrationError('Cannot retry an '\
-                    'unregistered task')
+                    'unassigned task')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found'\
                     'to perform task')
 
-        self.api.updateTaskState(self.task_id, 201, 'Reset')
+        self.api.updateTaskState(self._id, 201, 'Reset')
         return self
 
     def refresh(self):
@@ -125,38 +144,38 @@ class Task():
 
         :return: self
         """
-        if self.task_id is None:
+        if self._id is None:
             raise DANE.errors.APIRegistrationError('Cannot refresh an '\
-                    'unregistered task')
+                    'unassigned task')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found to'\
                     'refresh task')
 
-        task = self.api.taskFromTaskId(self.task_id)
-        self.task_state = task.task_state
-        self.task_msg = task.task_msg
+        task = self.api.taskFromTaskId(self._id)
+        self._state = task._state
+        self._msg = task._msg
         return self
 
     def isDone(self):
         """ Check if this task has been completed. 
 
-        A task is completed if it's `task_state` equals 200. This will
-        consult the API if the task_state isn't set.
+        A task is completed if it's `state` equals 200. This will
+        consult the API if the state isn't set.
 
         :return: Task doneness
         :rtype: bool
         """
-        if self.task_state is not None:
-            return self.task_state == 200
+        if self.state is not None:
+            return self.state == 200
 
-        if self.task_id is None:
+        if self._id is None:
             raise DANE.errors.APIRegistrationError('Cannot check doneness of an'\
-                    'unregistered task')
+                    'unassigned task')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found to check'\
                     'task doneness against')
 
-        return self.api.isDone(task_id = self.task_id)
+        return self.api.isDone(task_id = self._id)
 
     def state(self):
         """ Get task state of this job. 
@@ -164,17 +183,17 @@ class Task():
         :return: Task state 
         :rtype: int
         """
-        if self.task_state is not None:
-            return self.task_state
+        if self.state is not None:
+            return self.state
 
-        if self.task_id is None:
+        if self._id is None:
             raise DANE.errors.APIRegistrationError('Cannot get state of an'\
-                    'unregistered task')
+                    'unassigned task')
         elif self.api is None:
             raise DANE.errors.MissingEndpointError('No endpoint found to get'\
                     'task state from')
 
-        return self.api.getTaskState(task_id = task_id)
+        return self.api.getTaskState(task_id = self._id)
 
     def set_api(self, api):
         """Set the API for this task
@@ -197,24 +216,22 @@ class Task():
         fn(self)
         return self
 
-    def to_json(self):
+    def to_json(self, indent=None):
         """Returns this task serialised as JSON
 
         :return: JSON serialisation of the task
         :rtype: str
         """
-        task_data = { "task_key": self.task_key.upper(),
-                "task_id": self.task_id,
-                "task_state": self.task_state,
-                "task_msg": self.task_msg,
-                "job_id": self.job_id}
+        task_data = { "key": self.key.upper(),
+                "_id": self._id,
+                "state": self.state,
+                "msg": self.msg}
 
-        frmt = { k:v for k,v in task_data.items() if v is not None}
+        if len(self.args) > 0:
+            task_data['args'] = self.args
 
-        if len(frmt.keys()) > 1:
-            return "{{ \"Task\" : {}}}".format(json.dumps(frmt))
-        else:
-            return "\"{}\"".format(frmt['task_key'])
+        out = { k:v for k,v in task_data.items() if v is not None}
+        return json.dumps({"task": out}, indent=indent)
 
     @staticmethod
     def from_json(task_str):
@@ -225,7 +242,26 @@ class Task():
         :return: An initialised Task
         :rtype: :class:`DANE.Task`
         """
-        return parse(task_str)
+
+        if isinstance(task_str, str):
+            try:
+                task_str = json.loads(task_str)
+            except json.JSONDecodeError:
+                pass
+
+        if isinstance(task_str, str):
+            task = DANE.Task(task_str)
+        elif isinstance(task_str, dict) and len(task_str) == 1:
+            cls, params = list(task_str.items())[0]
+            if cls.lower() == 'task':
+                task = DANE.Task(**params)
+            else: 
+                raise TypeError(
+                        "{} must be Task subclass".format(task_str))
+        else:
+            raise ValueError("Expected task_str to be str or serialised class dict.")
+
+        return task
 
     def __str__(self):
         return self.to_json()

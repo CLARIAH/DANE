@@ -19,6 +19,7 @@ import pika
 import json
 import threading
 import functools
+import traceback
 
 class base_worker(ABC):
     """Abstract base class for a worker. 
@@ -107,26 +108,29 @@ class base_worker(ABC):
 
     def _callback(self, ch, method, props, body):
         try:
-            job = DANE.Job.from_json(body)
+            body = json.loads(body)
+            task = DANE.Task(**body['task'])
+            doc = DANE.Document(**body['document'])
         except TypeError as e:
             response = { 'state': 400, 
-                    'message': 'Invalid job format, unable to proceed'}
+                    'message': 'Invalid format, unable to proceed'}
 
             self._ack_and_reply(json.dumps(response), ch, method, props)
         except Exception as e:
+            traceback.print_exc() # TODO add a flag to disable this
             response = { 'state': 500, 
                     'message': 'Unhandled error: ' + str(e)}
 
             self._ack_and_reply(json.dumps(response), ch, method, props)
         else: 
             self.thread = threading.Thread(target=self._run, 
-                    args=(job, ch, method, props))
+                    args=(task, doc, ch, method, props))
             self.thread.setDaemon(True)
             self.thread.start()
 
-    def _run(self, job, ch, method, props):
+    def _run(self, task, doc, ch, method, props):
         try:
-            response = self.callback(job)
+            response = self.callback(task, doc)
         except DANE.errors.RefuseJobException:
             # worker doesnt want the job yet, nack it
             nack = functools.partial(ch.basic_nack, 
@@ -134,6 +138,8 @@ class base_worker(ABC):
             self.connection.add_callback_threadsafe(nack)
             return
         except Exception as e:
+            traceback.print_exc() # TODO add a flag to disable this
+
             response = { 'state': 500, 
                     'message': 'Unhandled worker error: ' + str(e)}
 
@@ -155,15 +161,17 @@ class base_worker(ABC):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     @abstractmethod
-    def callback(self, job_request):
+    def callback(self, task, document):
         """Function containing the core functionality that is specific to
         a worker. 
 
-        :param job_request: Job specification for new task
-        :type job_request: :class:`DANE.Job`
+        :param task: Task to be executed
+        :type task: :class:`DANE.Task`
+        :param document: Document the task is applied to
+        :type document: :class:`DANE.Document`
         :return: Task response with the `message`, `state`, and
             optional additional response information
-        :rtype: dict or str
+        :rtype: dict
         """
         return
 
@@ -180,7 +188,7 @@ class base_handler(ABC):
         self.config = config
 
     @abstractmethod
-    def register_job(self, job):
+    def registerDocument(self, job):
         """Register a job in the database
 
         :param job: The job
@@ -191,7 +199,7 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def delete_job(self, job):
+    def deleteDocument(self, job):
         """Delete a job and its underlying tasks from the database
 
         :param job: The job
@@ -200,17 +208,7 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def propagate_task_ids(self, job):
-        """The task list is updated to include task_ids by the registration,
-        propagate this change to the underlying database.
-
-        :param job: The job
-        :type job: :class:`DANE.Job`
-        """
-        return
-
-    @abstractmethod
-    def get_dirs(self, job):
+    def getDirs(self, job):
         """This function returns the TEMP and OUT directories for this job
         creating them if they do not yet exist
         output should be stored in response['SHARED']
@@ -223,13 +221,13 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def register(self, job_id, task):
-        """Register a task in the database
+    def assignTask(self, task, document_id):
+        """Assign a task to a document
 
-        :param job_id: id of the job this task belongs to
-        :type job_id: int
-        :param task: the task to register
+        :param task: the task to assign
         :type task: :class:`DANE.Task`
+        :param document_id: id of the job this task belongs to
+        :type document_id: int
         :return: task_id
         :rtype: int
         """
@@ -269,7 +267,7 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def jobFromJobId(self, job_id):
+    def documentFromDocumentId(self, job_id):
         """Construct and return a :class:`DANE.Job` given a job_id
         
         :param job_id: The id for the job
@@ -280,7 +278,7 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def jobFromTaskId(self, task_id):
+    def documentFromTaskId(self, task_id):
         """Construct and return a :class:`DANE.Job` given a task_id
         
         :param task_id: The id of a task

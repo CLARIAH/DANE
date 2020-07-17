@@ -1,14 +1,11 @@
-Installation instructions
+Installation 
 ======================================
 
-In the current stage of development we recommend to install DANE as a local pip package. Eventually we
-expect it to be available through PyPi.
+DANE is available through PyPi: `pypi.org/project/DANE <https://pypi.org/project/DANE/>`. To install simply run
 
 .. code:: bash
 
-    git clone https://github.com/CLARIAH/DANE.git
-    cd DANE/
-    pip install -e .
+    pip install DANE
 
-The -e flag indicates that it is an editable installation, i.e. if you git pull a new version or modify the code 
-this is directly reflected in the installed module.
+In order to use DANE it is, in most cases, necessary to specify a configuration. How the DANE configuration works is
+specified :ref:`Here <config>`.
