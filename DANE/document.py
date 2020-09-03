@@ -21,28 +21,18 @@ from requests.utils import requote_uri
 
 class Document():
     """This is a class representation of a document in DANE, it holds both data 
-    and logic.
+    and some logic.
 
-    :param url: URL pointing to source material for this block
-    :type url: str
-    :param source_id: Id of the source object within the source collection
-    :type source_id: str
-    :param source_set: Deprecated parameter, will be removed in the future.
-    :type source_set: str
-    :param tasks: A specification of the tasks to be performed
-    :type tasks: :class:`DANE.taskContainer` or :class:`DANE.Task`
-    :param job_id: ID of the job, assigned by DANE-server
-    :type job_id: int, optional
-    :param metadata: Dictionary containing metadata related to the job, or
-        the source material
-    :type metadata: dict, optional
-    :param priority: Priority of the job in the task queue, defaults to 1
-    :type priority: int, optional
-    :param response: Dictionary containing results from other tasks
-    :type response: dict, optional
+    :param target: Dict containing `id`, `url`, and `type` keys to described
+        the target document.
+    :type target: dict
+    :param creator: Dict containing `id`, and `type` keys to describe the
+        document owner/creator.
     :param api: Reference to a class:`base_classes.base_handler` which is
-        used to communicate with the database, and queueing system.
+        used to communicate with the server.
     :type api: :class:`base_classes.base_handler`, optional
+    :param _id: ID of the document, assigned by DANE-server
+    :type _id: int, optional
     """
 
     VALID_TYPES = ["Dataset", "Image", "Video", "Sound", "Text"]
@@ -78,9 +68,9 @@ class Document():
         return self.to_json()
 
     def to_json(self, indent=None):
-        """Returns this job serialised as JSON, excluding the API reference.
+        """Returns this document serialised as JSON, excluding the API reference.
 
-        :return: JSON string of the job
+        :return: JSON string of the document
         :rtype: str
         """
         out = {}
@@ -99,15 +89,18 @@ class Document():
         """Constructs a :class:`DANE.Document` instance from a JSON string
 
         :param json_str: Serialised :class:`DANE.Document`
-        :type json_str: str
-        :return: JSON string of the job
+        :type json_str: str or dict
+        :return: JSON string of the document
         :rtype: :class:`DANE.Document`
         """
-        data = json.loads(json_str)
-        return Document(**data)
+
+        if isinstance(json_str, str):
+            json_str = json.loads(json_str)
+
+        return Document(**json_str)
 
     def set_api(self, api):
-        """Set the API for the job and all subtasks
+        """Set the API for the document
 
         :param api: Reference to a :class:`base_classes.base_handler` which is
             used to communicate with the database, and queueing system.
@@ -118,7 +111,7 @@ class Document():
         return self
 
     def register(self):
-        """Register this document in DANE, this will assign a _id to the
+        """Register this document in DANE, this will assign an _id to the
         document. Requires an API to be set.
 
         :return: self
@@ -136,4 +129,24 @@ class Document():
     def delete(self):
         """Delete this document. Requires an API to be set.
         """
+        if self.api is None:
+            raise DANE.errors.MissingEndpointError('No API found')
+
         return self.api.deleteDocument(document=self)
+
+    def getAssignedTasks(self, task_key = None):
+        """Retrieve tasks assigned to this document. Accepts an optional
+        task_key to filter for a specific type of tasks. Requires an
+        API to be set.
+
+        :param task_key: Key of task type to filter for
+        :type task_key: string, optional
+        :return: list of dicts with task keys and ids."""
+
+        if self._id is None:
+            raise DANE.errors.APIRegistrationError('Document needs to be registered')
+        elif self.api is None:
+            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+                    'query tasks')
+
+        return self.api.getAssignedTasks(self._id, task_key)

@@ -1,33 +1,33 @@
-from DANE.base_classes import base_handler
+from DANE.handlers import base_handler
 import uuid
 
 class DummyHandler(base_handler):
     def __init__(self):
         super().__init__({}) # pass empty config
-        self.job_register = {}
+        self.doc_register = {}
         self.task_register = {}
 
-    def register_job(self, job):
+    def registerDocument(self, document):
         idx = str(uuid.uuid4())
-        job.job_id = idx
-        self.job_register[idx] = job
+        document._id = idx
+        self.doc_register[idx] = document
         return idx
 
-    def delete_job(self, job):
-        del self.job_register[job.job_id]
+    def deleteDocument(self, document):
+        del self.doc_register[document.document_id]
 
-    def propagate_task_ids(self, job):
-        self.job_register[job.job_id] = job
-
-    def register(self, job_id, task):
-        if job_id in self.job_register.keys():
+    def assignTask(self, task, document_id):
+        if document_id in self.doc_register.keys():
             idx = str(len(self.task_register))
-            # store job state as HTTP response codes
-            self.task_register[idx] = (task, 202, job_id)
+            task._id = idx
+            # store document state as HTTP response codes
+            self.task_register[idx] = (task, document_id)
+            task.state = 202
+            task.msg = 'Created'
         else:
-            raise APIRegistrationError('Unregistered job or unknown job id!'\
-                    'Register job first')
-        return idx
+            raise APIRegistrationError('Unregistered document or unknown document id!'\
+                    'Register document first')
+        return task.run()
 
     def taskFromTaskId(self, task_id):
         return self.task_register[task_id]
@@ -38,41 +38,51 @@ class DummyHandler(base_handler):
     def getTaskKey(self, task_id):
         return self.taskFromTaskId(task_id)[0]
 
-    def jobFromJobId(self, job_id):
-        return self.job_register[job_id] 
+    def documentFromDocumentId(self, document_id):
+        return self.doc_register[document_id] 
 
-    def jobFromTaskId(self, task_id):
-        return self.job_register[self.task_register[task_id][2]] 
+    def documentFromTaskId(self, task_id):
+        return self.doc_register[self.task_register[task_id][2]] 
 
     def run(self, task_id):
-        task, state, job_id = self.task_register[task_id]
-        self.task_register[task_id] = (task, 200, job_id)
+        task, document_id = self.task_register[task_id]
+        self.updateTaskState(task._id, 200, 'Success!')
         print('DummyEndpoint: Executed task {} for '\
-                'job: {}'.format(task.task_key, job_id))
+                'document: {}'.format(task.key, document_id))
 
-    def retry(self, task_id):
-        task, state, job_id = self.task_register[task_id]
-        self.task_register[task_id] = (task, 200, job_id)
+    def retry(self, task_id, force=False):
+        task, document_id = self.task_register[task_id]
+        self.updateTaskState(task._id, 200, 'Retried successfully!')
         print('DummyEndpoint: Retried task {} for '\
-                'job: {}'.format(task.task_key, job_id))
+                'document: {}'.format(task.key, document_id))
 
     def callback(self, task_id, response):
         print('DummyEndpoint: Callback response {} for '\
                 'task_id: {}'.format(response, task_id))
 
-    def get_dirs(self, job):
-        return {
-            'TEMP_FOLDER': './',
-            'OUT_FOLDER': './'
-        }
+    def updateTaskState(self, task_id, state, message):        
+        task, _ = self.task_register[task_id]
+        task.state = state
+        task.msg = message
+        #self.task_register[task_id] = (state, message, document_id)
 
-    def updateTaskState(self, task_id, state, message, response=None):        
-        _, _, job_id = self.task_register[task_id]
-        self.task_register[task_id] = (state, message, job_id)
-
-    def search(self, source_id, source_set=None):
+    def search(self, target_id, creator_id):
         return
 
     def getUnfinished(self):
-        return [i for t,s,i in self.task_register if s == 200]
+        return [t._id for t,_ in self.task_register if t.state != 200]
 
+    def registerResult(self, result, task_id):
+        return
+
+    def deleteResult(self, result):
+        return
+
+    def resultFromResultId(self, result_id):
+        return
+
+    def searchResult(document_id, task_key):
+        return
+
+    def getAssignedTasks(self, document_id, task_key=None):
+        return

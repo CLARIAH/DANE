@@ -25,6 +25,8 @@ class Task():
 
     :param key: Key of the task, should match a binding key of a worker
     :type key: str
+    :param priority: Priority to give to this task in queue. Defautls to 1.
+    :type priority: int
     :param _id: id assigned by DANE-server to this task
     :type _id: int, optional
     :param api: Reference to a :class:`base_classes.base_handler` which is
@@ -34,7 +36,7 @@ class Task():
     :type state: int, optional
     :param msg: Textual message accompanying the state
     :type msg: str, optional
-    :param **kwargs: Arbitrary keyword arguments. Will be stored in task.args 
+    :param \**kwargs: Arbitrary keyword arguments. Will be stored in task.args 
     """
     def __init__(self, key, priority=1, _id = None, api = None, 
             state=None, msg=None, **kwargs):
@@ -54,8 +56,9 @@ class Task():
 
     def assign(self, document_id):
         """Assign a task to a document, this will set an _id for the
-        task. Requires an API to be set.
+        task and run it. Requires an API to be set.
         
+        :param document_id: id of document to assign this task to.
         :return: self
         """
         if self._id is not None:
@@ -68,7 +71,8 @@ class Task():
         return self
 
     def assignMany(self, document_ids):
-        """Assign this task to multiple documents. Requires an API to be set.
+        """Assign this task to multiple documents and run it. 
+        Requires an API to be set.
         """
         if self._id is not None:
             raise DANE.errors.APIRegistrationError('Cannot call assignMany'\
@@ -80,9 +84,14 @@ class Task():
         if not isinstance(document_ids, Iterable) \
                 or isinstance(document_ids, str):
             raise TypeError('document_ids must be iterable')
-
+        
+        response = {}
         for d_id in document_ids:
-            self.api.assignTask(task=self, document_id=d_id)
+            try:
+                response[d_id] = self.api.assignTask(task=self, document_id=d_id)
+            except ValueError as e:
+                response[d_id] = str(e)
+        return response
 
     def run(self):
         """Run this task, requires it to be registered
@@ -152,8 +161,8 @@ class Task():
                     'refresh task')
 
         task = self.api.taskFromTaskId(self._id)
-        self._state = task._state
-        self._msg = task._msg
+        self.state = task.state
+        self.msg = task.msg
         return self
 
     def isDone(self):
@@ -178,7 +187,7 @@ class Task():
         return self.api.isDone(task_id = self._id)
 
     def state(self):
-        """ Get task state of this job. 
+        """ Get task state of this task. 
 
         :return: Task state 
         :rtype: int
@@ -225,7 +234,8 @@ class Task():
         task_data = { "key": self.key.upper(),
                 "_id": self._id,
                 "state": self.state,
-                "msg": self.msg}
+                "msg": self.msg,
+                "priority": self.priority}
 
         if len(self.args) > 0:
             task_data['args'] = self.args
@@ -235,7 +245,7 @@ class Task():
 
     @staticmethod
     def from_json(task_str):
-        """Calls :func:`DANE.parse` on the input.
+        """Constructs a :class:`DANE.Task` instance from a JSON string
 
         :param task_str: Serialised :class:`DANE.Task`
         :type task_str: str or dict
@@ -244,14 +254,9 @@ class Task():
         """
 
         if isinstance(task_str, str):
-            try:
-                task_str = json.loads(task_str)
-            except json.JSONDecodeError:
-                pass
+            task_str = json.loads(task_str)
 
-        if isinstance(task_str, str):
-            task = DANE.Task(task_str)
-        elif isinstance(task_str, dict) and len(task_str) == 1:
+        if isinstance(task_str, dict) and len(task_str) == 1:
             cls, params = list(task_str.items())[0]
             if cls.lower() == 'task':
                 task = DANE.Task(**params)
@@ -259,7 +264,7 @@ class Task():
                 raise TypeError(
                         "{} must be Task subclass".format(task_str))
         else:
-            raise ValueError("Expected task_str to be str or serialised class dict.")
+            task = DANE.Task(**task_str)
 
         return task
 

@@ -14,12 +14,15 @@
 ##############################################################################
 
 import DANE
+import DANE.utils
+from DANE.handlers import ESHandler
 from abc import ABC, abstractmethod
 import pika
 import json
 import threading
 import functools
 import traceback
+import os.path
 
 class base_worker(ABC):
     """Abstract base class for a worker. 
@@ -36,18 +39,45 @@ class base_worker(ABC):
     :type binding_key: str or list
     :param config: Config settings of the worker
     :type config: dict
+    :param depends_on: List of task_keys that need to have been performed on
+        the document before this task can be run
+    :type depends_on: list, optional
     :param auto_connect: Connect to AMQ on init, set to false to debug worker
         as a standalone class.
     :type auto_connect: bool, optional
     """
-    def __init__(self, queue, binding_key, config, auto_connect=True):
+
+    VALID_TYPES = ["Dataset", "Image", "Video", "Sound", "Text", "*", "#"]
+    def __init__(self, queue, binding_key, config, depends_on=[], 
+            auto_connect=True):
+
         self.queue = queue
+
+        type_filter = binding_key.split('.')[0]
+        if type_filter not in self.VALID_TYPES:
+            raise ValueError("Invalid type filter `{}`. Valid types are: {}".format(
+                type_filter, 
+                ", ".join(self.VALID_TYPES)))
+
         self.binding_key = binding_key
 
         self.config = config
+        self.depends_on = depends_on
         self._connected = False
+
+        if DANE.utils.cwd_is_git():
+        # if the cwd is a git repo we can prefill the generator dict
+            self.generator = { 'id': DANE.utils.get_git_revision(),
+                    "type": "Software",
+                    "name": self.queue,
+                    "homepage": DANE.utils.get_git_remote()}
+        else:
+            self.generator = None
+
         if auto_connect:
             self.connect()
+
+        self.handler = ESHandler(config)
 
     def connect(self):
         """Connect the worker to the AMQ. Called by init if autoconnecting.
@@ -109,8 +139,46 @@ class base_worker(ABC):
     def _callback(self, ch, method, props, body):
         try:
             body = json.loads(body)
+            if 'task' not in body.keys() or 'document' not in body.keys():
+                raise KeyError(('Incompleted task specification, '
+                    'require both `task` and `document` information'))
+
             task = DANE.Task(**body['task'])
-            doc = DANE.Document(**body['document'])
+            doc = DANE.Document(**body['document'], api=self.handler)
+
+            done = True # assume assigned are done, unless find otherwise
+            if len(self.depends_on) > 0:
+
+                assigned = doc.getAssignedTasks()
+                assigned_keys = [a[1] for a in assigned]
+
+                for dep in self.depends_on:
+                    if dep not in assigned_keys:
+                        # this task is not yet assigned to the document
+                        # create and assign it
+                        td = DANE.Task(dep, api=self.handler)
+                        td.assign(doc._id)
+                        done = False
+                    else:
+                        # only need to check if this is done if all preceding deps are done
+                        if done:
+                            # task is assigned to the document, but is it done?
+                            if any([a[2] != 200 for a in assigned if a[1] == dep]):
+                                # a task of type dep is assigned that isnt done
+                                # wait for it
+                                done = False
+            if not done:
+                # some dependency isnt done yet, wait for it
+                response = { 'state': 412, 
+                        'message': 'Unfinished dependencies'}
+
+                self._ack_and_reply(json.dumps(response), ch, method, props)
+            else: 
+                self.thread = threading.Thread(target=self._run, 
+                        args=(task, doc, ch, method, props))
+                self.thread.setDaemon(True)
+                self.thread.start()
+
         except TypeError as e:
             response = { 'state': 400, 
                     'message': 'Invalid format, unable to proceed'}
@@ -122,11 +190,6 @@ class base_worker(ABC):
                     'message': 'Unhandled error: ' + str(e)}
 
             self._ack_and_reply(json.dumps(response), ch, method, props)
-        else: 
-            self.thread = threading.Thread(target=self._run, 
-                    args=(task, doc, ch, method, props))
-            self.thread.setDaemon(True)
-            self.thread.start()
 
     def _run(self, task, doc, ch, method, props):
         try:
@@ -160,6 +223,42 @@ class base_worker(ABC):
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
+    def getDirs(self, document):
+        """This function returns the TEMP and OUT directories for this job
+        creating them if they do not yet exist
+        output should be stored in response['SHARED']
+        
+        :param job: The job
+        :type job: :class:`DANE.Job`
+        :return: Dict with keys `TEMP_FOLDER` and `OUT_FOLDER`
+        :rtype: dict
+        """
+        # expect that TEMP and OUT folder exist 
+        TEMP_SOURCE = self.config.PATHS.TEMP_FOLDER
+        OUT_SOURCE = self.config.PATHS.OUT_FOLDER
+
+        if not os.path.exists(TEMP_SOURCE):
+            os.mkdir(TEMP_SOURCE)
+        if not os.path.exists(OUT_SOURCE):
+            os.mkdir(OUT_SOURCE)
+
+        # Get a more specific path name, by chunking id into (at most)
+        # three chunks of 2 characters
+        chunks = os.path.join(*[document._id[i:2+i] for i in range(0, 
+            min(len(document._id),6), 2)])
+        TEMP_DIR = os.path.join(TEMP_SOURCE, chunks, document._id)
+        OUT_DIR = os.path.join(OUT_SOURCE, chunks, document._id)
+
+        if not os.path.exists(TEMP_DIR):
+            os.makedirs(TEMP_DIR)
+        if not os.path.exists(OUT_DIR):
+            os.makedirs(OUT_DIR)
+
+        return {
+            'TEMP_FOLDER': TEMP_DIR,
+            'OUT_FOLDER': OUT_DIR
+        }
+
     @abstractmethod
     def callback(self, task, document):
         """Function containing the core functionality that is specific to
@@ -171,213 +270,6 @@ class base_worker(ABC):
         :type document: :class:`DANE.Document`
         :return: Task response with the `message`, `state`, and
             optional additional response information
-        :rtype: dict
-        """
-        return
-
-class base_handler(ABC):
-    """Abstract base class for a handler. 
-
-    A handler functions as the API used in DANE to facilitate all communication
-    with the database and the queueing system. 
-    
-    :param config: Config settings for the handler
-    :type config: dict
-    """
-    def __init__(self, config):
-        self.config = config
-
-    @abstractmethod
-    def registerDocument(self, job):
-        """Register a job in the database
-
-        :param job: The job
-        :type job: :class:`DANE.Job`
-        :return: job_id
-        :rtype: int
-        """
-        return
-
-    @abstractmethod
-    def deleteDocument(self, job):
-        """Delete a job and its underlying tasks from the database
-
-        :param job: The job
-        :type job: :class:`DANE.Job`
-        """
-        return
-
-    @abstractmethod
-    def getDirs(self, job):
-        """This function returns the TEMP and OUT directories for this job
-        creating them if they do not yet exist
-        output should be stored in response['SHARED']
-        
-        :param job: The job
-        :type job: :class:`DANE.Job`
-        :return: Dict with keys `TEMP_FOLDER` and `OUT_FOLDER`
-        :rtype: dict
-        """
-        return
-
-    @abstractmethod
-    def assignTask(self, task, document_id):
-        """Assign a task to a document
-
-        :param task: the task to assign
-        :type task: :class:`DANE.Task`
-        :param document_id: id of the job this task belongs to
-        :type document_id: int
-        :return: task_id
-        :rtype: int
-        """
-        return
-
-    @abstractmethod
-    def taskFromTaskId(self, task_id):
-        """Retrieve task for a given task_id
-
-        :param task_id: id of the task
-        :type task_id: int
-        :return: the task, or error if it doesnt exist
-        :rtype: :class:`DANE.Task`
-        """
-        return
-    
-    @abstractmethod
-    def getTaskState(self, task_id):
-        """Retrieve state for a given task_id
-
-        :param task_id: id of the task
-        :type task_id: int
-        :return: task_state
-        :rtype: int
-        """
-        return
-
-    @abstractmethod
-    def getTaskKey(self, task_id):
-        """Retrieve task_key for a given task_id
-
-        :param task_id: id of the task
-        :type task_id: int
-        :return: task_key
-        :rtype: str
-        """
-        return
-
-    @abstractmethod
-    def documentFromDocumentId(self, job_id):
-        """Construct and return a :class:`DANE.Job` given a job_id
-        
-        :param job_id: The id for the job
-        :type job_id: int
-        :return: The job
-        :rtype: :class:`DANE.Job`
-        """
-        return
-
-    @abstractmethod
-    def documentFromTaskId(self, task_id):
-        """Construct and return a :class:`DANE.Job` given a task_id
-        
-        :param task_id: The id of a task
-        :type task_id: int
-        :return: The job
-        :rtype: :class:`DANE.Job`
-        """
-        return
-
-    def isDone(self, task_id):
-        """Verify whether a task is done.
-
-        Doneness is determined by whether or not its state is `200`.
-        
-        :param task_id: The id of a task
-        :type task_id: int
-        :return: Task doneness
-        :rtype: bool
-        """
-        return self.getTaskState(task_id) == 200
-
-    @abstractmethod
-    def run(self, task_id):
-        """Run the task with this id, and change its task state to `102`.
-
-        Running a task involves submitting it to a queue, so results might
-        only be available much later. Expects a task to have state `201`,
-        and it may retry tasks with state `502` or `503`.
-        
-        :param task_id: The id of a task
-        :type task_id: int
-        """
-        return
-
-    @abstractmethod
-    def retry(self, task_id, force=False):
-        """Retry the task with this id.
-
-        Attempts to run a task which previously might have crashed. Defaults
-        to skipping tasks with state 200, or 102, unless Force is specified,
-        then it should rerun regardless of previous state.
-        
-        :param task_id: The id of a task
-        :type task_id: int
-        :param force: Force task to rerun regardless of previous state
-        :type force: bool, optional
-        """
-        return
-
-    @abstractmethod
-    def callback(self, task_id, response):
-        """Function that is called once a task gives back a response.
-
-        This updates the state and response of the task in the database,
-        and then calls :func:`DANE.Job.run()` to trigger the next task.
-
-        :param task_id: The id of a task
-        :type task_id: int
-        :param response: Task response, should contain at least the `state`
-            and a `message`
-        :type response: dict
-        """
-        return
-
-    @abstractmethod
-    def updateTaskState(self, task_id, state, message, response=None):        
-        """Update the state and message of a task.
-
-        if a response is supplied then it will be added to the job response 
-        dict.
-
-        :param task_id: The id of a task
-        :type task_id: int, required
-        :param state: The new task state
-        :type state: int, required
-        :param message: The new task message
-        :type message: string, required
-        :param response: Task response
-        :type response: dict
-        """
-        return
-
-    @abstractmethod
-    def search(self, source_id):
-        """Returns jobs which exist for this source material.
-
-        :param source_id: The id of the source material
-        :type source_id: int
-        :return: ids of found jobs
-        :rtype: dict
-        """
-        return
-
-    @abstractmethod
-    def getUnfinished(self):
-        """Returns jobs which are not finished, i.e., 
-        jobs which have tasks that dont have state `200` 
-
-        :return: ids of found jobs
         :rtype: dict
         """
         return

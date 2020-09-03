@@ -44,6 +44,13 @@ cfg.RABBITMQ.RESPONSE_QUEUE = 'DANE-response-queue'
 cfg.RABBITMQ.USER = 'guest'
 cfg.RABBITMQ.PASSWORD = 'guest'
 
+cfg.ELASTICSEARCH = CN()
+cfg.ELASTICSEARCH.HOST = 'localhost'
+cfg.ELASTICSEARCH.PORT = 9200
+cfg.ELASTICSEARCH.USER = 'elastic'
+cfg.ELASTICSEARCH.PASSWORD = 'changeme'
+cfg.ELASTICSEARCH.SCHEME = 'http'
+
 cfg.CUDA = CN(new_allowed=True)
 cfg.CUDA.VISIBLE_DEVICES = '1'
 

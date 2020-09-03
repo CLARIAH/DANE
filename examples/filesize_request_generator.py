@@ -35,19 +35,32 @@ class filesize_server():
         self.channel.stop_consuming()
 
     def simulate_request(self):
-        job = DANE.Job(source_url=__file__, 
-            source_id='TEST',
-            tasks=DANE.taskSequential(['FILESIZE']))
+        task = DANE.Task('FILESIZE')
+        document = DANE.Document(
+            {
+                'id': 'THIS',
+                'url': 'filesize_request_generator.py',
+                'type': 'Text'
+            },{
+                'id': 'FileSizeExample',
+                'type': 'Software'
+            }
+        ) 
 
         self.corr_id = str(uuid.uuid4())
         self.channel.basic_publish(
             exchange=self.config.EXCHANGE,
-            routing_key='plaintext.FILESIZE',
+            routing_key='#.FILESIZE',
             properties=pika.BasicProperties(
                 reply_to='response_queue',
                 correlation_id=self.corr_id,
             ),
-            body=job.to_json())
+            body=json.dumps({
+                # flipflop between json and object is intentional
+                # but maybe not most elegant way..
+                'task': json.loads(task.to_json())['task'],
+                'document': json.loads(document.to_json())
+                }))
 
 if __name__ == '__main__':
 

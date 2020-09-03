@@ -15,4 +15,20 @@
 
 import json
 import sys
+import subprocess
 import DANE
+
+def get_git_revision():
+    return subprocess.check_output(['git', 
+        'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+
+def get_git_remote():
+    return subprocess.check_output(['git', 
+        'config', '--get', 'remote.origin.url']).decode('ascii').strip()
+
+def cwd_is_git():
+    try:
+        subprocess.check_output(['git', 'branch'], stderr=subprocess.DEVNULL)
+        return True
+    except:
+        return False

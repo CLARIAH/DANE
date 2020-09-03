@@ -6,10 +6,10 @@ API stuff
 .. toctree::
     :maxdepth: 2
 
+    document
     tasks
-    taskcontainers
-    jobs
+    result
+    handlers
     base_classes
-    registry
     utils
     errors
