@@ -61,6 +61,16 @@ class base_handler(ABC):
         return
 
     @abstractmethod
+    def deleteTask(self, task):
+        """Delete a task.
+
+        :param task: the task to delete
+        :type task: :class:`DANE.Task`
+        :return: bool 
+        """
+        return
+
+    @abstractmethod
     def taskFromTaskId(self, task_id):
         """Retrieve task for a given task_id
 

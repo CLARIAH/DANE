@@ -201,6 +201,13 @@ class ESHandler(handlers.base_handler):
 
         return task.run()
 
+    def deleteTask(self, task):
+        try:
+            self.es.delete(INDEX, task._id) 
+            return True
+        except EX.NotFoundError as e:
+            return False
+
     def taskFromTaskId(self, task_id):
 
         query = {

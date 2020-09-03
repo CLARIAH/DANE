@@ -93,6 +93,16 @@ class Task():
                 response[d_id] = str(e)
         return response
 
+    def delete(self):
+        """Delete this task, requires it to be registered
+
+        :return: bool
+        """
+        if self._id is None:
+            raise KeyError("Cannot delete an unregistered task")
+
+        return self.api.deleteTask(self)
+
     def run(self):
         """Run this task, requires it to be registered
         
