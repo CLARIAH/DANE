@@ -195,7 +195,7 @@ class ESHandler(handlers.base_handler):
 
         task._id = res['_id']
         
-        logger.debug("Assigned task {} () to document #{}".format(task.key,
+        logger.debug("Assigned task {} to document #{}".format(task.key,
             task._id,
             document_id))
 
@@ -375,18 +375,19 @@ class ESHandler(handlers.base_handler):
         else:
             raise KeyError("No result for given result_id")
 
-    def searchResult(document_id, task_key):
+    def searchResult(self, document_id, task_key):
+        # find tasks of type task_key below this document
         query = {
-         "_source": False,
+          "_source": False,
           "query": {
             "bool": {
               "must": [
                 {
                   "has_parent": {
                     "parent_type": "document",
-                    "query": { # since we must have a query..
-                      "exists": {
-                        "field": "target.id"
+                    "query": { 
+                      "match": {
+                        "_id": document_id
                       }
                     }
                   }
@@ -403,6 +404,7 @@ class ESHandler(handlers.base_handler):
         
         result = self.es.search(index=INDEX, body=query)
         
+        # if we found tasks then check all of them for the result
         if result['hits']['total']['value'] > 0:
             shld = []
             for res in result['hits']['hits']:
@@ -431,7 +433,7 @@ class ESHandler(handlers.base_handler):
                 }
               }
             }
-            result = es.search(index=INDEX, body=query)
+            result = self.es.search(index=INDEX, body=query)
             
             if result['hits']['total']['value'] > 0:
                 found = []
@@ -487,7 +489,21 @@ class ESHandler(handlers.base_handler):
             message = response.pop('message')
 
             self.updateTaskState(task_id, state, message)
-            if state != 200:
+
+            doc = None
+            if state == 412:
+                logger.debug("Dependencies for task {} ({})".format(
+                    task_id, task_key))
+                dependencies = response.pop('dependencies')
+                if len(dependencies) > 0:
+                    doc = self.documentFromTaskId(task_id)
+                    doc.set_api(self)
+
+                for dep in dependencies:
+                    td = DANE.Task(dep, api=self)
+                    td.assign(doc._id)
+                    self.run(td._id)
+            elif state != 200:
                 logger.warning("Task {} ({}) failed with msg: #{} {}".format(
                     task_key, task_id, state, message))            
             else:
@@ -495,14 +511,15 @@ class ESHandler(handlers.base_handler):
                     task_key))
 
                 # only trigger other tasks for this document if the task was succesful
-                doc = self.documentFromTaskId(task_id)
-                doc.set_api(self)
+                if doc is None:
+                    doc = self.documentFromTaskId(task_id)
+                    doc.set_api(self)
 
                 assigned = doc.getAssignedTasks()
-                for _id, key, st in assigned:
-                    if (_id != task_id  # dont retrigger self
-                            and st in [201, 412, 502, 503]):
-                        self.run(_id) 
+                for at in assigned:
+                    if (at['_id'] != task_id  # dont retrigger self
+                            and at['state'] in [201, 412, 502, 503]):
+                        self.run(at['_id']) 
 
         except KeyError as e:
             logger.exception('Callback on non-existing task')

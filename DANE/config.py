@@ -65,6 +65,10 @@ cfg.REGISTRY.USER = 'dane'
 cfg.REGISTRY.ENABLED = False # registry off by default
 cfg.REGISTRY.DATASTORE = './'
 
+cfg.PATHS = CN(new_allowed=True)
+cfg.PATHS.TEMP_FOLDER = './TEMP'
+cfg.PATHS.OUT_FOLDER = './OUT'
+
 # Does the home dir have a config with additional param?
 # Add them. Or override defaults defined here
 if os.path.exists(os.path.join(cfg.DANE.HOME_DIR, "config.yml")):

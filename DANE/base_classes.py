@@ -150,27 +150,28 @@ class base_worker(ABC):
             if len(self.depends_on) > 0:
 
                 assigned = doc.getAssignedTasks()
-                assigned_keys = [a[1] for a in assigned]
+                assigned_keys = [a['key'] for a in assigned]
 
+                dependencies = []
                 for dep in self.depends_on:
                     if dep not in assigned_keys:
                         # this task is not yet assigned to the document
                         # create and assign it
-                        td = DANE.Task(dep, api=self.handler)
-                        td.assign(doc._id)
+                        dependencies.append(dep)
                         done = False
                     else:
                         # only need to check if this is done if all preceding deps are done
                         if done:
                             # task is assigned to the document, but is it done?
-                            if any([a[2] != 200 for a in assigned if a[1] == dep]):
+                            if any([a['state'] != 200 for a in assigned if a['key'] == dep]):
                                 # a task of type dep is assigned that isnt done
                                 # wait for it
                                 done = False
             if not done:
                 # some dependency isnt done yet, wait for it
                 response = { 'state': 412, 
-                        'message': 'Unfinished dependencies'}
+                        'message': 'Unfinished dependencies',
+                        'dependencies': dependencies }
 
                 self._ack_and_reply(json.dumps(response), ch, method, props)
             else: 

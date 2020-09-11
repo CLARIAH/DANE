@@ -268,7 +268,9 @@ class Task():
 
         if isinstance(task_str, dict) and len(task_str) == 1:
             cls, params = list(task_str.items())[0]
-            if cls.lower() == 'task':
+            if cls.lower() == 'key':
+                task = DANE.Task(key=params)
+            elif cls.lower() == 'task':
                 task = DANE.Task(**params)
             else: 
                 raise TypeError(
