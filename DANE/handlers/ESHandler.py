@@ -135,6 +135,33 @@ class ESHandler(handlers.base_handler):
             raise KeyError("Failed to delete unregistered document")
 
         try:
+            # delete tasks assigned to this document first
+            query = {
+              "query": {
+                "bool": {
+                  "must": [
+                    {
+                      "has_parent": {
+                        "parent_type": "document",
+                        "query": { 
+                          "match": {
+                            "_id": document._id
+                          }
+                        }
+                      }
+                    },
+
+                    { "exists": {
+                        "field": "task.key"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+            self.es.delete_by_query(INDEX, body=query)
+            #TODO delete results also
+
             self.es.delete(INDEX, document._id)
             logger.info("Deleted document #{}".format(document._id))
             return True
@@ -538,20 +565,31 @@ class ESHandler(handlers.base_handler):
 
     def search(self, target_id, creator_id):
         query = {
-            "_source": False,
+            "_source": {
+                "excludes": [ "role" ]    
+             },
             "query": {
                 "bool": {
                     "must": [
-                        { "match": { "target.id": target_id }},
-                        { "match": { "creator.id": creator_id }}
+                        { "wildcard": { "target.id":  {
+                            "value": target_id 
+                            }
+                        } },
+                        { "wildcard": { "creator.id":  {
+                            "value": creator_id 
+                            }
+                        } }
                     ]
                 }
             }
         }
 
-        res = self.es.search(index=INDEX, body=query)
+        res = self.es.search(index=INDEX, body=query, size=100)
 
-        return {'documents': [doc['_id'] for doc in res['hits']['hits'] ] }
+        return [{'_id': doc['_id'], 
+            'target': doc['_source']['target'],
+            'creator': doc['_source']['creator']
+            } for doc in res['hits']['hits'] ]
 
     def getUnfinished(self):
         query = {
@@ -623,7 +661,8 @@ class ESHandler(handlers.base_handler):
         if result['hits']['total']['value'] > 0:
             return [{'_id': t['_id'], 
                 'key': t['_source']['task']['key'],
-                'state': t['_source']['task']['state']} for t \
+                'state': t['_source']['task']['state'],
+                'msg': t['_source']['task']['msg']} for t \
                     in result['hits']['hits']]
         else:
             return []

@@ -43,6 +43,9 @@ cfg.RABBITMQ.EXCHANGE = 'DANE-exchange'
 cfg.RABBITMQ.RESPONSE_QUEUE = 'DANE-response-queue'
 cfg.RABBITMQ.USER = 'guest'
 cfg.RABBITMQ.PASSWORD = 'guest'
+cfg.RABBITMQ.MANAGEMENT = True # Set to false if no Rabbitmq management plugin
+cfg.RABBITMQ.MANAGEMENT_PORT = 15672
+cfg.RABBITMQ.MANAGEMENT_HOST = 'localhost'
 
 cfg.ELASTICSEARCH = CN()
 cfg.ELASTICSEARCH.HOST = 'localhost'

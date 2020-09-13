@@ -240,8 +240,7 @@ class base_handler(ABC):
 
         :param target_id: The id of the target
         :param creator_id: The id of the creator
-        :return: ids of found documents
-        :rtype: dict
+        :return: list of found documents
         """
         return
 
