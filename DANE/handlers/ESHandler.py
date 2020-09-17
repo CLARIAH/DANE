@@ -111,7 +111,7 @@ class ESHandler(handlers.base_handler):
     def registerDocument(self, document):
         
         docs = self.search(document.target['id'],
-                document.creator['id'])['documents']
+                document.creator['id'])
 
         if len(docs) > 0:
             raise ValueError('A document with target.id `{}`, '\
@@ -162,7 +162,7 @@ class ESHandler(handlers.base_handler):
             self.es.delete_by_query(INDEX, body=query)
             #TODO delete results also
 
-            self.es.delete(INDEX, document._id)
+            self.es.delete(INDEX, document._id, refresh=True)
             logger.info("Deleted document #{}".format(document._id))
             return True
         except EX.NotFoundError as e:
