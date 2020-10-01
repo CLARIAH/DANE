@@ -53,6 +53,8 @@ cfg.ELASTICSEARCH.PORT = 9200
 cfg.ELASTICSEARCH.USER = 'elastic'
 cfg.ELASTICSEARCH.PASSWORD = 'changeme'
 cfg.ELASTICSEARCH.SCHEME = 'http'
+cfg.ELASTICSEARCH.SHARDS = 1
+cfg.ELASTICSEARCH.REPLICAS = 1
 
 cfg.CUDA = CN(new_allowed=True)
 cfg.CUDA.VISIBLE_DEVICES = '1'
@@ -60,13 +62,6 @@ cfg.CUDA.VISIBLE_DEVICES = '1'
 cfg.CONFIG = CN(new_allowed=False)
 # If a base.config.yml sets this to true, then a config.yml is required
 cfg.CONFIG.REQUIRED = False
-
-cfg.REGISTRY = CN(new_allowed=False)
-cfg.REGISTRY.TOKEN = ''
-cfg.REGISTRY.API = 'http://localhost/annotation_api'
-cfg.REGISTRY.USER = 'dane'
-cfg.REGISTRY.ENABLED = False # registry off by default
-cfg.REGISTRY.DATASTORE = './'
 
 cfg.PATHS = CN(new_allowed=True)
 cfg.PATHS.TEMP_FOLDER = './TEMP'

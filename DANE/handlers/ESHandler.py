@@ -50,8 +50,8 @@ class ESHandler(handlers.base_handler):
             self.es.indices.create(index=INDEX, body={
                 "settings" : {
                     "index" : {
-                        "number_of_shards" : 1,  # TODO do we need this?
-                        "number_of_replicas" : 1 
+                        "number_of_shards" : self.config.ELASTICSEARCH.SHARDS, 
+                        "number_of_replicas" : self.config.ELASTICSEARCH.REPLICAS 
                     }
                 },
                 "mappings": {
@@ -125,7 +125,7 @@ class ESHandler(handlers.base_handler):
         res = self.es.index(index=INDEX, body=json.dumps(doc), refresh=True)
         document._id = res['_id']
         
-        logger.info("Registered new document #{}".format(document._id))
+        logger.debug("Registered new document #{}".format(document._id))
         
         return document._id
 
@@ -135,10 +135,14 @@ class ESHandler(handlers.base_handler):
             raise KeyError("Failed to delete unregistered document")
 
         try:
-            # delete tasks assigned to this document first
+            # delete tasks assigned to this document first,
+            # and results assigned to those tasks
             query = {
               "query": {
-                "bool": {
+              "bool": {
+              "should": [
+                  { "bool": {
+                  # all tasks with this as parent
                   "must": [
                     {
                       "has_parent": {
@@ -156,17 +160,42 @@ class ESHandler(handlers.base_handler):
                       }
                     }
                   ]
-                }
+                } },
+                { "bool": {
+                    # all results that hang below a task with this as parent
+                    "must": [
+                    {
+                      "has_parent": {
+                        "parent_type": "task",
+                        "query": { 
+                             "has_parent": {
+                                    "parent_type": "document",
+                                    "query": {
+                                        "match": {
+                                            "_id": document._id
+                                        }
+                                    }
+                                }
+                            }
+                          }
+                    },
+                    { "exists": {
+                        "field": "result.generator.id"
+                      }
+                    }
+                  ]
+                } }
+              ]
+              }
               }
             }
             self.es.delete_by_query(INDEX, body=query)
-            #TODO delete results also
 
             self.es.delete(INDEX, document._id, refresh=True)
-            logger.info("Deleted document #{}".format(document._id))
+            logger.debug("Deleted document #{}".format(document._id))
             return True
         except EX.NotFoundError as e:
-            logger.info("Unable to delete non-existing document #{}".format(
+            logger.debug("Unable to delete non-existing document #{}".format(
                 document._id))
             return False
         
@@ -230,6 +259,31 @@ class ESHandler(handlers.base_handler):
 
     def deleteTask(self, task):
         try:
+            # delete results assigned to this task
+            query = {
+              "query": {
+                 "bool": {
+                  "must": [
+                    {
+                      "has_parent": {
+                        "parent_type": "task",
+                        "query": { 
+                          "match": {
+                            "_id": task._id
+                          }
+                        }
+                      }
+                    },
+
+                    { "exists": {
+                        "field": "result.generator.id"
+                      }
+                    }
+                  ]
+                } 
+              }
+            }
+            self.es.delete_by_query(INDEX, body=query)
             self.es.delete(INDEX, task._id) 
             return True
         except EX.NotFoundError as e:
