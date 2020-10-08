@@ -53,11 +53,15 @@ class base_worker(ABC):
 
         self.queue = queue
 
-        type_filter = binding_key.split('.')[0]
-        if type_filter not in self.VALID_TYPES:
-            raise ValueError("Invalid type filter `{}`. Valid types are: {}".format(
-                type_filter, 
-                ", ".join(self.VALID_TYPES)))
+        if not isinstance(self.binding_key, list):
+            binding_key = [binding_key]
+
+        for bk in binding_key:
+            type_filter = bk.split('.')[0]
+            if type_filter not in self.VALID_TYPES:
+                raise ValueError("Invalid type filter `{}`. Valid types are: {}".format(
+                    type_filter, 
+                    ", ".join(self.VALID_TYPES)))
 
         self.binding_key = binding_key
 
