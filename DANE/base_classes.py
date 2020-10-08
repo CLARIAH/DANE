@@ -53,7 +53,7 @@ class base_worker(ABC):
 
         self.queue = queue
 
-        if not isinstance(self.binding_key, list):
+        if not isinstance(binding_key, list):
             binding_key = [binding_key]
 
         for bk in binding_key:
