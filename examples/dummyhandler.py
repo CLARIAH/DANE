@@ -29,6 +29,9 @@ class DummyHandler(base_handler):
                     'Register document first')
         return task.run()
 
+    def deleteTask(self, task):
+        del self.task_register[task._id]
+
     def taskFromTaskId(self, task_id):
         return self.task_register[task_id]
 
