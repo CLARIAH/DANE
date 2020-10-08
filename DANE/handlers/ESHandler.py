@@ -290,7 +290,7 @@ class ESHandler(handlers.base_handler):
               }
             }
             self.es.delete_by_query(INDEX, body=query)
-            self.es.delete(INDEX, task._id) 
+            self.es.delete(INDEX, task._id, refresh=True) 
             return True
         except EX.NotFoundError as e:
             return False
