@@ -46,6 +46,12 @@ class ESHandler(handlers.base_handler):
             port=self.config.ELASTICSEARCH.PORT,
         ) 
 
+        try:
+            if not self.es.ping():
+                raise ValueError("ES Connection Failed")
+        except Exception as e:
+            raise ValueError("ES Connection Failed")
+
         if not self.es.indices.exists(index=INDEX):
             self.es.indices.create(index=INDEX, body={
                 "settings" : {
