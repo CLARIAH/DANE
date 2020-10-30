@@ -28,6 +28,7 @@ class Document():
     :type target: dict
     :param creator: Dict containing `id`, and `type` keys to describe the
         document owner/creator.
+    :type creator: dict
     :param api: Reference to a class:`base_classes.base_handler` which is
         used to communicate with the server.
     :type api: :class:`base_classes.base_handler`, optional

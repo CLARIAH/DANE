@@ -247,7 +247,7 @@ class ESHandler(handlers.base_handler):
         task.state = 201
         task.msg = 'Created'
 
-        t = json.loads(task.to_json())
+        t = {'task': json.loads(task.to_json())}
         t['role'] = { 'name': 'task', 'parent': document_id }
 
         res = self.es.index(index=INDEX, 
@@ -257,7 +257,7 @@ class ESHandler(handlers.base_handler):
 
         task._id = res['_id']
         
-        logger.debug("Assigned task {} to document #{}".format(task.key,
+        logger.debug("Assigned task {}({}) to document #{}".format(task.key,
             task._id,
             document_id))
 
@@ -653,7 +653,9 @@ class ESHandler(handlers.base_handler):
 
     def getUnfinished(self):
         query = {
-         "_source": False,
+        "_source": {
+            "excludes": [ "role" ]    
+         },
           "query": {
             "bool": {
               "must": [
@@ -681,7 +683,14 @@ class ESHandler(handlers.base_handler):
         
         result = self.es.search(index=INDEX, body=query)
 
-        return {'tasks': [res['_id'] for res in result['hits']['hits']]}
+        if result['hits']['total']['value'] > 0:
+            return [{'_id': t['_id'], 
+                'key': t['_source']['task']['key'],
+                'state': t['_source']['task']['state'],
+                'msg': t['_source']['task']['msg']} for t \
+                    in result['hits']['hits']]
+        else:
+            return []
 
     def getAssignedTasks(self, document_id, task_key=None):
         query = {

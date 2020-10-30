@@ -99,7 +99,7 @@ class RabbitMQHandler():
                 body=json.dumps({
                     # flipflop between json and object is intentional
                     # but maybe not most elegant way..
-                    'task': json.loads(task.to_json())['task'],
+                    'task': json.loads(task.to_json()),
                     'document': json.loads(document.to_json())
                     }))
         except Exception as e:

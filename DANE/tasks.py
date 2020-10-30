@@ -88,7 +88,7 @@ class Task():
         response = {}
         for d_id in document_ids:
             try:
-                response[d_id] = self.api.assignTask(task=self, document_id=d_id)
+                response[d_id] = self.api.assignTask(task=self.__copy__(), document_id=d_id)
             except ValueError as e:
                 response[d_id] = str(e)
         return response
@@ -251,7 +251,7 @@ class Task():
             task_data['args'] = self.args
 
         out = { k:v for k,v in task_data.items() if v is not None}
-        return json.dumps({"task": out}, indent=indent)
+        return json.dumps(out, indent=indent)
 
     @staticmethod
     def from_json(task_str):
@@ -282,3 +282,7 @@ class Task():
 
     def __str__(self):
         return self.to_json()
+
+    def __copy__(self):
+        return Task(self.key, self.priority, self._id, 
+                self.api, self.state, self.msg, **self.args)
