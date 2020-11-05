@@ -6,7 +6,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='DANE',
-    version='0.2.1',
+    version='0.2.2',
     author='Nanne van Noord',
     author_email='n.j.e.vannoord@uva.nl',
     url='https://github.com/CLARIAH/DANE',
