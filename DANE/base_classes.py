@@ -45,11 +45,13 @@ class base_worker(ABC):
     :param auto_connect: Connect to AMQ on init, set to false to debug worker
         as a standalone class.
     :type auto_connect: bool, optional
+    :param no_api: Disable ESHandler, mainly for debugging.
+    :type no_api: bool, optional
     """
 
     VALID_TYPES = ["Dataset", "Image", "Video", "Sound", "Text", "*", "#"]
     def __init__(self, queue, binding_key, config, depends_on=[], 
-            auto_connect=True):
+            auto_connect=True, no_api=False):
 
         self.queue = queue
 
@@ -81,7 +83,10 @@ class base_worker(ABC):
         if auto_connect:
             self.connect()
 
-        self.handler = ESHandler(config)
+        if not no_api:
+            self.handler = ESHandler(config)
+        else:
+            self.handler = None
 
     def connect(self):
         """Connect the worker to the AMQ. Called by init if autoconnecting.
@@ -152,6 +157,8 @@ class base_worker(ABC):
 
             done = True # assume assigned are done, unless find otherwise
             if len(self.depends_on) > 0:
+                if self.handler is None:
+                    raise SystemError("No handler available to check worker dependencies")
 
                 assigned = doc.getAssignedTasks()
                 assigned_keys = [a['key'] for a in assigned]
