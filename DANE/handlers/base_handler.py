@@ -39,6 +39,16 @@ class base_handler(ABC):
         return
 
     @abstractmethod
+    def registerDocuments(self, documents):
+        """Register list of documents in the database
+
+        :param document: The document
+        :type document: :class:`DANE.Document`
+        :return: two lists with successfully and failed documents, as tuple
+        """
+        return
+
+    @abstractmethod
     def deleteDocument(self, document):
         """Delete a document and its underlying tasks from the database
 
@@ -57,6 +67,19 @@ class base_handler(ABC):
         :type document_id: int
         :return: task_id
         :rtype: int
+        """
+        return
+
+    @abstractmethod
+    def assignTaskToMany(self, task, document_ids):
+        """Assign a task to a document and run it.
+
+        :param task: the task to assign
+        :type task: :class:`DANE.Task`
+        :param document_id: list of ids of the documents to assign this to
+        :type document_id: [int]
+        :return: task_ids
+        :rtype: [int]
         """
         return
 

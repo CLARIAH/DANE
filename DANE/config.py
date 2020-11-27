@@ -59,6 +59,10 @@ cfg.ELASTICSEARCH.REPLICAS = 1
 cfg.CUDA = CN(new_allowed=True)
 cfg.CUDA.VISIBLE_DEVICES = '1'
 
+cfg.LOGGING = CN(new_allowed=True)
+cfg.LOGGING.LEVEL = 'DEBUG'
+cfg.LOGGING.DIR = '/var/logs/DANE'
+
 cfg.CONFIG = CN(new_allowed=False)
 # If a base.config.yml sets this to true, then a config.yml is required
 cfg.CONFIG.REQUIRED = False

@@ -15,11 +15,13 @@
 
 from elasticsearch import Elasticsearch
 from elasticsearch import exceptions as EX
+from elasticsearch import helpers
 import json
 import os
 import logging
 from functools import partial
 from urllib.parse import urlsplit
+import hashlib
 
 import DANE
 from DANE import handlers
@@ -48,8 +50,11 @@ class ESHandler(handlers.base_handler):
 
         try:
             if not self.es.ping():
-                raise ValueError("ES Connection Failed")
+                logger.info("Tried connecting to ES at {}:{}".format(self.config.ELASTICSEARCH.HOST,
+                    self.config.ELASTICSEARCH.PORT))
+                raise ValueError("ES could not be Pinged")
         except Exception as e:
+            logger.exception("ES Connection Failed")
             raise ValueError("ES Connection Failed")
 
         if not self.es.indices.exists(index=INDEX):
@@ -116,25 +121,70 @@ class ESHandler(handlers.base_handler):
 
     def registerDocument(self, document):
         
-        docs = self.search(document.target['id'],
-                document.creator['id'])
+        doc = json.loads(document.to_json())
+        doc['role'] = 'document'
 
-        if len(docs) > 0:
-            raise ValueError('A document with target.id `{}`, '\
+        _id = hashlib.sha1(
+                (str(document.target['id']) + str(document.creator['id'])
+                    ).encode('utf-8')).hexdigest()
+
+        try:
+            res = self.es.index(index=INDEX, body=json.dumps(doc), 
+                    id=_id, refresh=True, op_type='create')
+        except EX.ConflictError as e:
+            raise DANE.errors.DocumentExistsError('A document with target.id `{}`, '\
                     'and creator.id `{}` already exists'.format(
                         document.target['id'],
                         document.creator['id']))
 
-        doc = json.loads(document.to_json())
-        doc['role'] = 'document'
-
-        res = self.es.index(index=INDEX, body=json.dumps(doc), refresh=True)
         document._id = res['_id']
-        
         logger.debug("Registered new document #{}".format(document._id))
         
         return document._id
 
+    def registerDocuments(self, documents):
+        
+        actions = []
+        for document in documents:
+            doc = {}
+            doc['_op_type'] = 'create'
+            doc['_index'] = INDEX
+
+            doc['_source'] = json.loads(document.to_json())
+            doc['_source']['role'] = 'document'
+            document._id = doc['_id'] = hashlib.sha1(
+                    (str(document.target['id']) + str(document.creator['id'])
+                        ).encode('utf-8')).hexdigest()
+            actions.append(doc)
+
+        succeeded, errors = helpers.bulk(self.es, actions, raise_on_error=False)
+        logger.debug("Batch registration: Success {} Failed {}".format(
+            succeeded, len(errors)))
+
+        if len(errors) == 0:
+            return documents, []
+        else:
+            success = []
+            failed = []
+            errors = { e['create']['_id'] : e['create'] for e in errors }
+            for document in documents:
+                if document._id in errors.keys():
+                    if errors[document._id]['status'] == 409:
+                        failed.append({'document': document, 
+                        'error':'A document with target.id `{}`, '\
+                            'and creator.id `{}` already exists'.format(
+                        document.target['id'],
+                        document.creator['id'])})
+                    else:
+                        failed.append({'document': document, 
+                        'error': "[{}] {}".format(
+                            errors[document._id]['status'],
+                            errors[document._id]['error']['reason'])})
+                else:
+                    success.append(document)
+            return success, failed
+
+        
     def deleteDocument(self, document):
         if document._id is None:
             logger.error("Can only delete registered documents")
@@ -210,39 +260,8 @@ class ESHandler(handlers.base_handler):
             raise KeyError('No document with id `{}` found'.format(
                 document_id))
 
-        query = {
-          "query": {
-            "bool": {
-              "must": [
-                {
-                  "has_child": {
-                    "type": "task",
-                    "query": {
-                      "bool": {
-                        "must": {
-                          "match": {
-                            "task.key": task.key
-                          }
-                        }
-                      }
-                    }
-                  }
-                },
-                {
-                  "match": {
-                    "_id": document_id
-                  }
-                }
-              ]
-            }
-          }
-        }
-
-        if self.es.count(index=INDEX, body=query)['count'] > 0:
-            raise ValueError('Task `{}` '\
-                    'already assigned to document `{}`'.format(
-                        task.key,
-                        document_id))
+        _id = hashlib.sha1(
+                (document_id + task.key).encode('utf-8')).hexdigest()
 
         task.state = 201
         task.msg = 'Created'
@@ -250,10 +269,17 @@ class ESHandler(handlers.base_handler):
         t = {'task': json.loads(task.to_json())}
         t['role'] = { 'name': 'task', 'parent': document_id }
 
-        res = self.es.index(index=INDEX, 
-                routing=document_id,
-                body=json.dumps(t),
-                refresh=True)
+        try:
+            res = self.es.index(index=INDEX, 
+                    routing=document_id,
+                    body=json.dumps(t),
+                    id=_id,
+                    refresh=True, op_type='create')
+        except EX.ConflictError as e:
+            raise DANE.errors.TaskAssignedError('Task `{}` '\
+                    'already assigned to document `{}`'.format(
+                        task.key,
+                        document_id))
 
         task._id = res['_id']
         
@@ -262,6 +288,87 @@ class ESHandler(handlers.base_handler):
             document_id))
 
         return task.run()
+
+    def assignTaskToMany(self, task, document_ids):
+        failed = []
+        searches = []
+        for document_id in document_ids:
+            searches.append("{}")
+            searches.append(json.dumps({"query": { "match": {
+                "_id": document_id} },
+                "_source": "false" }))
+
+        docs = []
+        for d, d_id in zip(self.es.msearch("\n".join(searches), index=INDEX)['responses'], document_ids):
+            if d['hits']['total']['value'] == 1:
+                docs.append(d_id)
+            elif d['hits']['total']['value'] == 0:
+                failed.append({'document_id': d_id, 
+                        'error': "[404] 'No document with id `{}` found'".format(
+                            document_id)})
+            else:
+                failed.append({'document_id': d_id, 
+                        'error': "[500] 'Multiple documents found with id `{}`'".format(
+                            document_id)})
+        document_ids = docs
+        del docs
+
+        task.state = 201
+        task.msg = 'Created'
+
+        actions = []
+        tasks = []
+        for document_id in document_ids:
+            t = {}
+            tc = task.__copy__()
+
+            t['_source'] = { 'task': json.loads(tc.to_json())}
+            t['_source']['role'] = { 'name': 'task', 'parent': document_id }
+            t['_op_type'] = 'create'
+            t['_index'] = INDEX
+            t['_routing'] = document_id
+
+            tc._id = t['_id'] = hashlib.sha1(
+                (document_id + tc.key).encode('utf-8')).hexdigest()
+
+            tasks.append(tc)
+            actions.append(t)
+
+        succeeded, errors = helpers.bulk(self.es, actions, raise_on_error=False, refresh=True)
+        logger.debug("Batch task registration: Success {} Failed {}".format(
+            succeeded, len(errors)))
+
+        success = []
+        errors = { e['create']['_id'] : e['create'] for e in errors }
+        for task, document_id in zip(tasks, document_ids):
+            if task._id in errors.keys():
+                if errors[task._id]['status'] == 409:
+                    failed.append({'document_id': document_id, 
+                    'error':'Task `{}` '\
+                    'already assigned to document `{}`'.format(
+                        task.key,
+                        document_id)})
+                else:
+                    if 'caused_by' in errors[task._id]['error'].keys():
+                        errors[task._id]['error']['reason'] += " > " + \
+                                errors[task._id]['error']['caused_by']['reason']
+
+                    failed.append({'document_id': document_id, 
+                    'error': "[{}] {}".format(
+                        errors[task._id]['status'],
+                        errors[task._id]['error']['reason'])})
+            else:
+                success.append(task)
+
+        # run tasks from thread, so it doesnt block API response
+        t = threading.Thread(target=self._run_async, args=(success,))
+        t.daemon = True
+        t.start()
+        return success, failed
+
+    def _run_async(self, tasks):
+        for task in tasks:
+            task.run()
 
     def deleteTask(self, task):
         try:
@@ -325,7 +432,7 @@ class ESHandler(handlers.base_handler):
             }
           }
         }
-        
+
         result = self.es.search(index=INDEX, body=query)
 
         if result['hits']['total']['value'] == 1:
@@ -336,7 +443,7 @@ class ESHandler(handlers.base_handler):
             task.set_api(self)
             return task
         else:
-            raise KeyError("No result for given task id")
+            raise KeyError("No result for task id: {}".format(task_id))
 
     def getTaskState(self, task_id):
         return int(self.taskFromTaskId(task_id).state)
@@ -587,7 +694,11 @@ class ESHandler(handlers.base_handler):
                     doc.set_api(self)
 
                 for dep in dependencies:
-                    td = DANE.Task(dep, api=self)
+                    if isinstance(dep, dict):
+                        td = DANE.Task.from_json(dep)
+                        td.set_api(self)
+                    else:
+                        td = DANE.Task(dep, api=self)
                     td.assign(doc._id)
                     self.run(td._id)
             elif state != 200:
@@ -623,11 +734,15 @@ class ESHandler(handlers.base_handler):
             }
         }, refresh=True)
 
-    def search(self, target_id, creator_id):
+    def search(self, target_id, creator_id, page=1):
+        page = int(max(1, page)-1)
+        perpage = 100
+
         query = {
             "_source": {
                 "excludes": [ "role" ]    
              },
+            "from": page*perpage,
             "query": {
                 "bool": {
                     "must": [
@@ -644,12 +759,12 @@ class ESHandler(handlers.base_handler):
             }
         }
 
-        res = self.es.search(index=INDEX, body=query, size=100)
+        res = self.es.search(index=INDEX, body=query, size=perpage)
 
         return [{'_id': doc['_id'], 
             'target': doc['_source']['target'],
             'creator': doc['_source']['creator']
-            } for doc in res['hits']['hits'] ]
+            } for doc in res['hits']['hits'] ], res['hits']['total']['value']
 
     def getUnfinished(self):
         query = {

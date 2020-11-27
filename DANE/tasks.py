@@ -84,14 +84,8 @@ class Task():
         if not isinstance(document_ids, Iterable) \
                 or isinstance(document_ids, str):
             raise TypeError('document_ids must be iterable')
-        
-        response = {}
-        for d_id in document_ids:
-            try:
-                response[d_id] = self.api.assignTask(task=self.__copy__(), document_id=d_id)
-            except ValueError as e:
-                response[d_id] = str(e)
-        return response
+
+        return self.api.assignTaskToMany(task=self, document_ids=document_ids)
 
     def delete(self):
         """Delete this task, requires it to be registered

@@ -43,3 +43,11 @@ class ConfigRequiredError(Exception):
     """Error to indicate that the base_config.yml is declared abstract,
     and that it requires a config.yml.
     """
+
+class DocumentExistsError(Exception):
+    """Raised when document does (not) exists.
+    """
+
+class TaskAssignedError(Exception):
+    """Raised when task is already/not yet assigned.
+    """
