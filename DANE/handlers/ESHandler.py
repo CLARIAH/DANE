@@ -669,9 +669,10 @@ class ESHandler(handlers.base_handler):
             if result['hits']['total']['value'] > 0:
                 found = []
                 for res in result['hits']['hits']:
-                    res['_source']['_id'] = \
-                            res['_id']
-                    found.append(DANE.Result.from_json(json.dumps(res['_source'])))
+                    r = { '_id': res['hits']['hits'][0]['_id'] }
+                    r = { **r, **res['hits']['hits'][0]['_source']['result']}
+
+                    found.append(DANE.Result.from_json(json.dumps(r)))
                 return found
             else:
                 raise KeyError("No result found for {} assigned to {}".format(
