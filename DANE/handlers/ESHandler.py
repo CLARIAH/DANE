@@ -367,8 +367,13 @@ class ESHandler(handlers.base_handler):
         return success, failed
 
     def _run_async(self, tasks):
+        return
         for task in tasks:
-            task.run()
+            try:
+                task.run()
+            except Exception as e:
+                logger.exception("Exception during async run")
+                pass # ignore exceptions, and just GO GO GO
 
     def deleteTask(self, task):
         try:
@@ -704,20 +709,21 @@ class ESHandler(handlers.base_handler):
             elif state != 200:
                 logger.warning("Task {} ({}) failed with msg: #{} {}".format(
                     task_key, task_id, state, message))            
+                # only continue if the task was succesful
+                return
             else:
                 logger.debug("Callback for task {} ({})".format(task_id, 
                     task_key))
 
-                # only trigger other tasks for this document if the task was succesful
-                if doc is None:
-                    doc = self.documentFromTaskId(task_id)
-                    doc.set_api(self)
+            if doc is None:
+                doc = self.documentFromTaskId(task_id)
+                doc.set_api(self)
 
-                assigned = doc.getAssignedTasks()
-                for at in assigned:
-                    if (at['_id'] != task_id  # dont retrigger self
-                            and at['state'] in [201, 412, 502, 503]):
-                        self.run(at['_id']) 
+            assigned = doc.getAssignedTasks()
+            for at in assigned:
+                if (at['_id'] != task_id  # dont retrigger self
+                        and at['state'] in [201, 412, 502, 503]):
+                    self.run(at['_id']) 
 
         except KeyError as e:
             logger.exception('Callback on non-existing task')
@@ -796,7 +802,7 @@ class ESHandler(handlers.base_handler):
             }
           }
         
-        result = self.es.search(index=INDEX, body=query)
+        result = self.es.search(index=INDEX, body=query, size=1000)
 
         if result['hits']['total']['value'] > 0:
             return [{'_id': t['_id'], 
