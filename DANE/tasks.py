@@ -59,7 +59,6 @@ class Task():
             self.args = kwargs['args']
         else:
             self.args = kwargs
-            self.args['args'] = 'bla'
 
     def assign(self, document_id):
         """Assign a task to a document, this will set an _id for the
