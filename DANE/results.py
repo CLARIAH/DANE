@@ -68,7 +68,7 @@ class Result():
         :return: self
         """
 
-        self._id = self.api.registerResult(self, task_id)
+        self = self.api.registerResult(self, task_id)
         return self
 
     def delete(self):
@@ -105,7 +105,7 @@ class Result():
         :rtype: :class:`DANE.Result`
         """
 
-        data = json.loads(json_str)['result']
+        data = json.loads(json_str)
         return Result(**data)
 
     def __str__(self):

@@ -36,10 +36,12 @@ class Task():
     :type state: int, optional
     :param msg: Textual message accompanying the state
     :type msg: str, optional
+    :param created_at: Creation date
+    :param updated_at: Last modified date
     :param \**kwargs: Arbitrary keyword arguments. Will be stored in task.args 
     """
     def __init__(self, key, priority=1, _id = None, api = None, 
-            state=None, msg=None, **kwargs):
+            state=None, msg=None, created_at=None, updated_at=None, **kwargs):
         if key is None or key == '':
             raise ValueError("task key cannot be empty string \"\" or None")
 
@@ -49,10 +51,15 @@ class Task():
         self.state = state
         self.msg = msg
         self.api = api
+
+        self.created_at = created_at
+        self.updated_at = updated_at
+
         if len(kwargs) == 1 and list(kwargs.keys())[0] == 'args':
             self.args = kwargs['args']
         else:
             self.args = kwargs
+            self.args['args'] = 'bla'
 
     def assign(self, document_id):
         """Assign a task to a document, this will set an _id for the
@@ -239,6 +246,8 @@ class Task():
                 "_id": self._id,
                 "state": self.state,
                 "msg": self.msg,
+                "created_at": self.created_at,
+                "updated_at": self.updated_at,
                 "priority": self.priority}
 
         if len(self.args) > 0:
@@ -269,6 +278,10 @@ class Task():
             else: 
                 raise TypeError(
                         "{} must be Task subclass".format(task_str))
+        elif "task" in task_str.keys():
+            task_str = {**task_str['task'], **task_str }
+            del task_str['task']
+            task = DANE.Task(**task_str)
         else:
             task = DANE.Task(**task_str)
 

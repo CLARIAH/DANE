@@ -34,12 +34,15 @@ class Document():
     :type api: :class:`base_classes.base_handler`, optional
     :param _id: ID of the document, assigned by DANE-server
     :type _id: int, optional
+    :param created_at: Creation date
+    :param updated_at: Last modified date
     """
 
     VALID_TYPES = ["Dataset", "Image", "Video", "Sound", "Text"]
     VALID_AGENTS = ["Organization", "Human", "Software"]
 
-    def __init__(self, target, creator, api=None, _id=None):
+    def __init__(self, target, creator, api=None, _id=None, 
+            created_at=None, updated_at=None):
         
         if not {"id", "url", "type"} <= target.keys() and len(target['id']) > 2:
             raise KeyError("Target object must contains at least the `id`," + \
@@ -61,6 +64,9 @@ class Document():
                 ", ".join(self.VALID_AGENTS)))
 
         self.creator = creator
+
+        self.created_at = created_at
+        self.updated_at = updated_at
 
         self.api = api
         self._id = _id

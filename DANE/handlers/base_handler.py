@@ -246,7 +246,7 @@ class base_handler(ABC):
 
     @abstractmethod
     def updateTaskState(self, task_id, state, message):        
-        """Update the state and message of a task.
+        """Update the state, message, and last updated of a task.
 
         :param task_id: The id of a task
         :type task_id: int, required
@@ -268,10 +268,11 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def getUnfinished(self):
+    def getUnfinished(self, only_runnable=False):
         """Returns tasks which are not finished, i.e., 
         tasks that dont have state `200` 
 
+        :param only_runnable: Return only tasks that can be `run()`
         :return: ids of found tasks
         :rtype: dict
         """

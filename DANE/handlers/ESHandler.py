@@ -22,6 +22,7 @@ import logging
 from functools import partial
 from urllib.parse import urlsplit
 import hashlib
+import datetime
 
 import DANE
 from DANE import handlers
@@ -74,6 +75,15 @@ class ESHandler(handlers.base_handler):
                                 "task": "result"
                             }
                         },
+                        # shared prop
+                        "created_at": { 
+                            "type": "date",
+                            "format": "date_hour_minute_second"
+                        },
+                        "updated_at": { 
+                            "type": "date",
+                            "format": "date_hour_minute_second"
+                        },
                         # document properties
                         "target": {
                             "properties": {
@@ -123,6 +133,8 @@ class ESHandler(handlers.base_handler):
         
         doc = json.loads(document.to_json())
         doc['role'] = 'document'
+        doc['created_at'] = doc['updated_at'] = \
+            datetime.datetime.now().replace(microsecond=0).isoformat()
 
         _id = hashlib.sha1(
                 (str(document.target['id']) + str(document.creator['id'])
@@ -138,6 +150,8 @@ class ESHandler(handlers.base_handler):
                         document.creator['id']))
 
         document._id = res['_id']
+        document.created_at = doc['created_at']
+        document.updated_at = doc['updated_at']
         logger.debug("Registered new document #{}".format(document._id))
         
         return document._id
@@ -152,9 +166,15 @@ class ESHandler(handlers.base_handler):
 
             doc['_source'] = json.loads(document.to_json())
             doc['_source']['role'] = 'document'
+
+            doc['_source']['created_at'] = doc['_source']['updated_at'] = \
+                datetime.datetime.now().replace(microsecond=0).isoformat()
+            
             document._id = doc['_id'] = hashlib.sha1(
                     (str(document.target['id']) + str(document.creator['id'])
                         ).encode('utf-8')).hexdigest()
+            document.created_at = doc['_source']['created_at']
+            document.updated_at = doc['_source']['updated_at']
             actions.append(doc)
 
         succeeded, errors = helpers.bulk(self.es, actions, raise_on_error=False)
@@ -268,6 +288,8 @@ class ESHandler(handlers.base_handler):
 
         t = {'task': json.loads(task.to_json())}
         t['role'] = { 'name': 'task', 'parent': document_id }
+        t['created_at'] = t['updated_at'] = \
+            datetime.datetime.now().replace(microsecond=0).isoformat()
 
         try:
             res = self.es.index(index=INDEX, 
@@ -282,6 +304,8 @@ class ESHandler(handlers.base_handler):
                         document_id))
 
         task._id = res['_id']
+        task.created_at = t['created_at']
+        task.updated_at = t['updated_at']
         
         logger.debug("Assigned task {}({}) to document #{}".format(task.key,
             task._id,
@@ -324,12 +348,15 @@ class ESHandler(handlers.base_handler):
 
             t['_source'] = { 'task': json.loads(tc.to_json())}
             t['_source']['role'] = { 'name': 'task', 'parent': document_id }
+            t['_source']['created_at'] = t['_source']['updated_at'] = \
+                datetime.datetime.now().replace(microsecond=0).isoformat()
             t['_op_type'] = 'create'
             t['_index'] = INDEX
             t['_routing'] = document_id
 
             tc._id = t['_id'] = hashlib.sha1(
                 (document_id + tc.key).encode('utf-8')).hexdigest()
+            tc['created_at'] = tc['updated_at'] = t['_source']['created_at']
 
             tasks.append(tc)
             actions.append(t)
@@ -367,7 +394,6 @@ class ESHandler(handlers.base_handler):
         return success, failed
 
     def _run_async(self, tasks):
-        return
         for task in tasks:
             try:
                 task.run()
@@ -410,7 +436,7 @@ class ESHandler(handlers.base_handler):
     def taskFromTaskId(self, task_id):
 
         query = {
-         "_source": "task",
+         "_source": ["task", "created_at", "updated_at"],
           "query": {
             "bool": {
               "must": [
@@ -519,12 +545,19 @@ class ESHandler(handlers.base_handler):
         r = json.loads(result.to_json())
         r['role'] = { 'name': 'result', 'parent': task_id }
 
+        r['created_at'] = r['updated_at'] = \
+            datetime.datetime.now().replace(microsecond=0).isoformat()
+
         res = self.es.index(index=INDEX, 
                 routing=task_id,
                 body=json.dumps(r),
                 refresh=True)
 
-        return res['_id']
+        result._id = res['_id']
+        result.created_at = r['created_at']
+        result.updated_at = r['updated_at']
+
+        return result
 
     def deleteResult(self, result):
         try:
@@ -566,11 +599,10 @@ class ESHandler(handlers.base_handler):
         result = self.es.search(index=INDEX, body=query)
         
         if result['hits']['total']['value'] == 1:
-            result['hits']['hits'][0]['_source']['_id'] = \
-                    result['hits']['hits'][0]['_id']
+            res = { '_id': result['hits']['hits'][0]['_id'] }
+            res = { **res, **result['hits']['hits'][0]['_source']['result']}
 
-            return DANE.Result.from_json(json.dumps(
-                result['hits']['hits'][0]['_source']))
+            return DANE.Result.from_json(json.dumps(res))
         else:
             raise KeyError("No result for given result_id")
 
@@ -731,12 +763,14 @@ class ESHandler(handlers.base_handler):
             logger.exception('Unhandled error during callback')
 
     def updateTaskState(self, task_id, state, message):        
+
         self.es.update(index=INDEX, id=task_id, body={
             "doc": {
                 "task": {
                     "state": state,
                     "msg": message
-                }
+                },
+                "updated_at": datetime.datetime.now().replace(microsecond=0).isoformat()
             }
         }, refresh=True)
 
@@ -772,7 +806,7 @@ class ESHandler(handlers.base_handler):
             'creator': doc['_source']['creator']
             } for doc in res['hits']['hits'] ], res['hits']['total']['value']
 
-    def getUnfinished(self):
+    def getUnfinished(self, only_runnable=False):
         query = {
         "_source": {
             "excludes": [ "role" ]    
@@ -795,13 +829,21 @@ class ESHandler(handlers.base_handler):
                     "task.state": 200 # already done!
                   }},
                 {"match": {
-                    "task.state": 412 # should be triggered once dependency finished
+                    "task.state": 412 # will be triggered once dependency finished
                   }}
                 ]
               }
             }
           }
         
+        if only_runnable: # TODO use state whitelist instead of blacklist?
+            query['query']['bool']['must_not'].extend([{"match": {
+                    "task.state": 422 # requires manual intervention
+                  }},
+                    {"match": {
+                    "task.state": 102 # are queued
+                  }}])
+
         result = self.es.search(index=INDEX, body=query, size=1000)
 
         if result['hits']['total']['value'] > 0:
