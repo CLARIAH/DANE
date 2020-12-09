@@ -359,7 +359,7 @@ class ESHandler(handlers.base_handler):
 
             tc._id = t['_id'] = hashlib.sha1(
                 (document_id + tc.key).encode('utf-8')).hexdigest()
-            tc['created_at'] = tc['updated_at'] = t['_source']['created_at']
+            tc.created_at = tc.updated_at = t['_source']['created_at']
 
             tasks.append(tc)
             actions.append(t)
