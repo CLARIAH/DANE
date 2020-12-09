@@ -55,6 +55,8 @@ cfg.ELASTICSEARCH.PASSWORD = 'changeme'
 cfg.ELASTICSEARCH.SCHEME = 'http'
 cfg.ELASTICSEARCH.SHARDS = 1
 cfg.ELASTICSEARCH.REPLICAS = 1
+cfg.ELASTICSEARCH.TIMEOUT = 30 # in seconds
+cfg.ELASTICSEARCH.MAX_RETRIES = 3 # 0 to disable retrying
 
 cfg.CUDA = CN(new_allowed=True)
 cfg.CUDA.VISIBLE_DEVICES = '1'

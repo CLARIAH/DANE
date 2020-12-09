@@ -13,12 +13,17 @@
 # limitations under the License.
 ##############################################################################
 
-class MissingEndpointError(Exception):
+class DANException(Exception):
+    """Wrapper for DANE exception.
+    """
+    pass
+
+class MissingEndpointError(DANException):
     """Raised when an action fails due to lack of API.
     """
     pass
 
-class APIRegistrationError(Exception):
+class APIRegistrationError(DANException):
     """Raised when registering the API fails.
     """
     pass
@@ -30,7 +35,7 @@ class ResourceConnectionError(ConnectionError):
     in a soft blanket of custom error handling."""
     pass
 
-class RefuseJobException(Exception):
+class RefuseJobException(DANException):
     """Exception for workers to throw when they want to refuse a job
     at this point in time.
 
@@ -39,15 +44,27 @@ class RefuseJobException(Exception):
     """
     pass
 
-class ConfigRequiredError(Exception):
+class ConfigRequiredError(DANException):
     """Error to indicate that the base_config.yml is declared abstract,
     and that it requires a config.yml.
     """
 
-class DocumentExistsError(Exception):
+class DocumentExistsError(DANException):
     """Raised when document does (not) exists.
     """
 
-class TaskAssignedError(Exception):
+class TaskExistsError(DANException):
+    """Raised when task does (not) exists.
+    """
+
+class ResultExistsError(DANException):
+    """Raised when result does (not) exists.
+    """
+
+class TaskAssignedError(DANException):
     """Raised when task is already/not yet assigned.
+    """
+
+class UnregisteredError(DANException):
+    """Raised when DANE object does not have an _id.
     """

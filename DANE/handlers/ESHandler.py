@@ -42,21 +42,28 @@ class ESHandler(handlers.base_handler):
         self.queue = queue
         
     def connect(self):
+
+        host = self.config.ELASTICSEARCH.HOST
+        if not isinstance(host, list):
+            host = [host]
         
-        self.es = Elasticsearch([self.config.ELASTICSEARCH.HOST],
+        self.es = Elasticsearch(host,
             http_auth=(self.config.ELASTICSEARCH.USER, self.config.ELASTICSEARCH.PASSWORD),
             scheme=self.config.ELASTICSEARCH.SCHEME,
             port=self.config.ELASTICSEARCH.PORT,
+            timeout=self.config.ELASTICSEARCH.TIMEOUT,
+            retry_on_timeout=(self.config.ELASTICSEARCH.MAX_RETRIES > 0),
+            max_retries=self.config.ELASTICSEARCH.MAX_RETRIES
         ) 
 
         try:
             if not self.es.ping():
                 logger.info("Tried connecting to ES at {}:{}".format(self.config.ELASTICSEARCH.HOST,
                     self.config.ELASTICSEARCH.PORT))
-                raise ValueError("ES could not be Pinged")
+                raise ConnectionError("ES could not be Pinged")
         except Exception as e:
             logger.exception("ES Connection Failed")
-            raise ValueError("ES Connection Failed")
+            raise ConnectionError("ES Connection Failed")
 
         if not self.es.indices.exists(index=INDEX):
             self.es.indices.create(index=INDEX, body={
@@ -208,7 +215,7 @@ class ESHandler(handlers.base_handler):
     def deleteDocument(self, document):
         if document._id is None:
             logger.error("Can only delete registered documents")
-            raise KeyError("Failed to delete unregistered document")
+            raise DANE.errors.UnregisteredError("Failed to delete unregistered document")
 
         try:
             # delete tasks assigned to this document first,
@@ -277,7 +284,7 @@ class ESHandler(handlers.base_handler):
         
     def assignTask(self, task, document_id):
         if not self.es.get(index=INDEX, id=document_id)['found']:
-            raise KeyError('No document with id `{}` found'.format(
+            raise DANE.errors.DocumentExistsError('No document with id `{}` found'.format(
                 document_id))
 
         _id = hashlib.sha1(
@@ -474,7 +481,7 @@ class ESHandler(handlers.base_handler):
             task.set_api(self)
             return task
         else:
-            raise KeyError("No result for task id: {}".format(task_id))
+            raise DANE.errors.TaskExistsError("No result for task id: {}".format(task_id))
 
     def getTaskState(self, task_id):
         return int(self.taskFromTaskId(task_id).state)
@@ -501,7 +508,7 @@ class ESHandler(handlers.base_handler):
             document.set_api(self)
             return document
         else:
-            raise KeyError("No result for given document id")
+            raise DANE.errors.DocumentExistsError("No result for given document id")
 
     def documentFromTaskId(self, task_id):
         query = {
@@ -537,7 +544,7 @@ class ESHandler(handlers.base_handler):
             document.set_api(self)
             return document
         else:
-            raise KeyError("No result for given task id")
+            raise DANE.errors.TaskExistsError("No result for given task id")
 
     ## Result functions
     def registerResult(self, result, task_id):
@@ -604,7 +611,7 @@ class ESHandler(handlers.base_handler):
 
             return DANE.Result.from_json(json.dumps(res))
         else:
-            raise KeyError("No result for given result_id")
+            raise DANE.errors.ResultExistsError("No result for given result_id")
 
     def searchResult(self, document_id, task_key):
         # find tasks of type task_key below this document
@@ -675,10 +682,10 @@ class ESHandler(handlers.base_handler):
                     found.append(DANE.Result.from_json(json.dumps(r)))
                 return found
             else:
-                raise KeyError("No result found for {} assigned to {}".format(
+                raise DANE.errors.ResultExistsError("No result found for {} assigned to {}".format(
                     task_key, document_id))
         else:
-            raise KeyError("Task {} has not been assigned to document {}".format(
+            raise DANE.errors.TaskAssignedError("Task {} has not been assigned to document {}".format(
                 task_key, document_id))
 
     def _run(self, task):
@@ -731,14 +738,14 @@ class ESHandler(handlers.base_handler):
                     doc = self.documentFromTaskId(task_id)
                     doc.set_api(self)
 
-                for dep in dependencies:
-                    if isinstance(dep, dict):
-                        td = DANE.Task.from_json(dep)
-                        td.set_api(self)
-                    else:
-                        td = DANE.Task(dep, api=self)
-                    td.assign(doc._id)
-                    self.run(td._id)
+                    for dep in dependencies:
+                        if isinstance(dep, dict):
+                            td = DANE.Task.from_json(dep)
+                            td.set_api(self)
+                        else:
+                            td = DANE.Task(dep, api=self)
+                        td.assign(doc._id)
+                        self.run(td._id)
             elif state != 200:
                 logger.warning("Task {} ({}) failed with msg: #{} {}".format(
                     task_key, task_id, state, message))            
@@ -758,7 +765,7 @@ class ESHandler(handlers.base_handler):
                         and at['state'] in [201, 412, 502, 503]):
                     self.run(at['_id']) 
 
-        except KeyError as e:
+        except DANE.errors.TaskExistsError as e:
             logger.exception('Callback on non-existing task')
         except Exception as e:
             logger.exception('Unhandled error during callback')
