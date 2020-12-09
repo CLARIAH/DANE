@@ -43,11 +43,7 @@ class ESHandler(handlers.base_handler):
         
     def connect(self):
 
-        host = self.config.ELASTICSEARCH.HOST
-        if not isinstance(host, list):
-            host = [host]
-        
-        self.es = Elasticsearch(host,
+        self.es = Elasticsearch(self.config.ELASTICSEARCH.HOST,
             http_auth=(self.config.ELASTICSEARCH.USER, self.config.ELASTICSEARCH.PASSWORD),
             scheme=self.config.ELASTICSEARCH.SCHEME,
             port=self.config.ELASTICSEARCH.PORT,

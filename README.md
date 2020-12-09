@@ -27,7 +27,7 @@ RABBITMQ:
     USER: 'guest'
     PASSWORD: 'guest'
 ELASTICSEARCH:
-    HOST: 'localhost'
+    HOST: ['localhost']
     PORT: 9200
     USER: 'elastic'
     PASSWORD: 'changeme'
