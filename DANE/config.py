@@ -37,7 +37,7 @@ cfg.DANE.API_URL = 'http://localhost:5500/DANE/' # URL the api can be reached at
 cfg.DANE.MANAGE_URL = 'http://localhost:5500/manage/'
 
 cfg.RABBITMQ = CN()
-cfg.RABBITMQ.HOST = ['localhost']
+cfg.RABBITMQ.HOST = 'localhost'
 cfg.RABBITMQ.PORT = 5672
 cfg.RABBITMQ.EXCHANGE = 'DANE-exchange'
 cfg.RABBITMQ.RESPONSE_QUEUE = 'DANE-response-queue'
@@ -48,7 +48,7 @@ cfg.RABBITMQ.MANAGEMENT_PORT = 15672
 cfg.RABBITMQ.MANAGEMENT_HOST = 'localhost'
 
 cfg.ELASTICSEARCH = CN()
-cfg.ELASTICSEARCH.HOST = 'localhost'
+cfg.ELASTICSEARCH.HOST = ['localhost']
 cfg.ELASTICSEARCH.PORT = 9200
 cfg.ELASTICSEARCH.USER = 'elastic'
 cfg.ELASTICSEARCH.PASSWORD = 'changeme'
