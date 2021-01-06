@@ -860,19 +860,17 @@ class ESHandler(handlers.base_handler):
             return []
 
     def getAssignedTasks(self, document_id, task_key=None):
+        # normally we'd need a has_parent query
+        # but thats terribly slow, and since _routing for task
+        # is set to document_id, we can abuse that
         query = {
          "_source": "task",
           "query": {
             "bool": {
               "must": [
                 {
-                  "has_parent": {
-                    "parent_type": "document",
-                    "query": { 
-                      "match": {
-                        "_id": document_id
-                      }
-                    }
+                  "match": {
+                    "_routing": document_id 
                   }
                 },
 
