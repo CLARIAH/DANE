@@ -758,7 +758,10 @@ class ESHandler(handlers.base_handler):
             assigned = doc.getAssignedTasks()
             for at in assigned:
                 if (at['_id'] != task_id  # dont retrigger self
-                        and at['state'] in [201, 412, 502, 503]):
+                        and (at['state'] in [201, 502, 503] or 
+                            # dont run other tasks for same doc
+                            # which are also waiting for a dependency:
+                            (at['state'] == 412 and state != 412))): 
                     self.run(at['_id']) 
 
         except DANE.errors.TaskExistsError as e:
