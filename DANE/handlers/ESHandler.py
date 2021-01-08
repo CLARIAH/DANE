@@ -847,6 +847,9 @@ class ESHandler(handlers.base_handler):
             query['query']['bool']['must_not'].extend([{"match": {
                     "task.state": 422 # requires manual intervention
                   }},
+                  {"match": {
+                    "task.state": 500 # requires manual intervention
+                  }},
                     {"match": {
                     "task.state": 102 # are queued
                   }}])
