@@ -84,7 +84,7 @@ class RabbitMQHandler():
     def assign_callback(self, callback):
         raise NotImplementedError('assign_callback should be implemented server-side')
 
-    def publish(self, routing_key, task, document):
+    def publish(self, routing_key, task, document, retry=False):
         try:
             self.pub_channel.basic_publish(
                 exchange=self.config.RABBITMQ.EXCHANGE,
@@ -102,5 +102,12 @@ class RabbitMQHandler():
                     'task': json.loads(task.to_json()),
                     'document': json.loads(document.to_json())
                     }))
+        except pika.exceptions.ChannelWrongStateError as e:
+            if not retry: # retry once
+                logger.exception('Publish error')
+                self.connect()
+                self.publish(routing_key, task, document, retry=True)
+            else:
+                raise e
         except Exception as e:
             raise e

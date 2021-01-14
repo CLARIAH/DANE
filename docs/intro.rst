@@ -141,6 +141,7 @@ State overview
 * `102`: Task has been sent to a queue, it might be being worked on or held in queue.
 * `200`: Task completed successfully.
 * `201`: Task is registered, but has not been acted upon.
+* `205`: Task reset state, typically after manual intervention
 * `400`: Malformed request, typically the document or task description.
 * `403`: Access denied to underlying source material.
 * `404`: Underlying source material not found.
@@ -150,5 +151,5 @@ State overview
 * `502`: Worker received invalid or partial input.
 * `503`: Worker received an error response from a remote service it depends on. 
 
-Tasks with state 412, 502, or 503, can be retried automatically. Whereas states 400, 403, 404, 422, and 500 require manual intervention. 
+Tasks with state 205, 412, 502, or 503, can be retried automatically. Whereas states 400, 403, 404, 422, and 500 require manual intervention. 
 Once a manual intervention has taken place the task can be resumed.

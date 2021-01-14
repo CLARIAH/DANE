@@ -690,18 +690,25 @@ class ESHandler(handlers.base_handler):
         routing_key = "{}.{}".format(document.target['type'], 
                 task.key)
 
-        logger.debug("Queueing task {} ({}) for document {}".format(task._id,
-            task.key, document._id))
-        self.updateTaskState(task._id, 102, 'Queued')
+        try:
+            logger.debug("Queueing task {} ({}) for document {}".format(task._id,
+                task.key, document._id))
+            self.updateTaskState(task._id, 102, 'Queued')
+        except Exception as e:
+            raise e
 
-        self.queue.publish(routing_key, task, document)
+        try:
+            self.queue.publish(routing_key, task, document)
+        except Exception as e:
+            self.updateTaskState(task._id, 500, str(e))
+            raise e
 
     def run(self, task_id):
         task = self.taskFromTaskId(task_id)
         if task.state == 201:
             # Fresh of the press task, run it no questions asked
             self._run(task)
-        elif task.state in [412, 502, 503]:
+        elif task.state in [205, 412, 502, 503]:
             # Task that might be worth automatically retrying 
             self._run(task)
         else:
@@ -808,10 +815,13 @@ class ESHandler(handlers.base_handler):
 
         res = self.es.search(index=INDEX, body=query, size=perpage)
 
-        return [{'_id': doc['_id'], 
-            'target': doc['_source']['target'],
-            'creator': doc['_source']['creator']
-            } for doc in res['hits']['hits'] ], res['hits']['total']['value']
+        ret = []
+        for doc in res['hits']['hits']:
+            doc['_source']['_id'] = doc['_id']
+            d = DANE.Document.from_json(doc['_source'])
+            ret.append(json.loads(d.to_json()))
+
+        return ret, res['hits']['total']['value'] 
 
     def getUnfinished(self, only_runnable=False):
         query = {
@@ -850,6 +860,15 @@ class ESHandler(handlers.base_handler):
                   {"match": {
                     "task.state": 500 # requires manual intervention
                   }},
+                  {"match": {
+                    "task.state": 400 # requires manual intervention
+                  }},
+                  {"match": {
+                    "task.state": 403 # requires manual intervention
+                  }},
+                  {"match": {
+                    "task.state": 404 # requires manual intervention
+                  }},
                     {"match": {
                     "task.state": 102 # are queued
                   }}])
@@ -857,11 +876,12 @@ class ESHandler(handlers.base_handler):
         result = self.es.search(index=INDEX, body=query, size=1000)
 
         if result['hits']['total']['value'] > 0:
-            return [{'_id': t['_id'], 
-                'key': t['_source']['task']['key'],
-                'state': t['_source']['task']['state'],
-                'msg': t['_source']['task']['msg']} for t \
-                    in result['hits']['hits']]
+            ret = []
+            for t in result['hits']['hits']:
+                t['_source']['task']['_id'] = t['_id']
+                task = DANE.Task.from_json(t['_source'])
+                ret.append(json.loads(task.to_json()))
+            return ret
         else:
             return []
 
@@ -870,7 +890,9 @@ class ESHandler(handlers.base_handler):
         # but thats terribly slow, and since _routing for task
         # is set to document_id, we can abuse that
         query = {
-         "_source": "task",
+        "_source": {
+            "excludes": [ "role" ]    
+         },
           "query": {
             "bool": {
               "must": [
@@ -899,10 +921,11 @@ class ESHandler(handlers.base_handler):
         result = self.es.search(index=INDEX, body=query)
 
         if result['hits']['total']['value'] > 0:
-            return [{'_id': t['_id'], 
-                'key': t['_source']['task']['key'],
-                'state': t['_source']['task']['state'],
-                'msg': t['_source']['task']['msg']} for t \
-                    in result['hits']['hits']]
+            ret = []
+            for t in result['hits']['hits']:
+                t['_source']['task']['_id'] = t['_id']
+                task = DANE.Task.from_json(t['_source'])
+                ret.append(json.loads(task.to_json()))
+            return ret
         else:
             return []
