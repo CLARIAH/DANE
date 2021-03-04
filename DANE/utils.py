@@ -19,8 +19,11 @@ import subprocess
 import DANE
 
 def get_git_revision():
-    return subprocess.check_output(['git', 
-        'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+    try:
+        return subprocess.check_output(['git', 
+            'rev-parse', '--short', 'HEAD'], stderr=subprocess.STDOUT).decode('ascii').strip()
+    except:
+        return "NO-REV"
 
 def get_git_remote():
     return subprocess.check_output(['git', 
