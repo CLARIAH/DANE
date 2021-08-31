@@ -353,7 +353,7 @@ class ESHandler(handlers.base_handler):
             t['_source']['created_at'] = t['_source']['updated_at'] = \
                 datetime.datetime.now().replace(microsecond=0).isoformat()
             t['_op_type'] = 'create'
-            t['_index'] = INDEX
+            t['_index'] = self.INDEX
             t['_routing'] = document_id
 
             tc._id = t['_id'] = hashlib.sha1(
