@@ -13,9 +13,9 @@
 # limitations under the License.
 ##############################################################################
 
-from elasticsearch import Elasticsearch
-from elasticsearch import exceptions as EX
-from elasticsearch import helpers
+from elasticsearch7 import Elasticsearch
+from elasticsearch7 import exceptions as EX
+from elasticsearch7 import helpers
 import json
 import os
 import logging
