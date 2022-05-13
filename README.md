@@ -11,7 +11,7 @@ This package can be installed through pip:
 
 ### Configuration
 
-DANE components are configured through the DANE.config module, which is described here: https://dane.readthedocs.io/en/latest/intro.html#configuration 
+DANE components are configured through the dane.config module, which is described here: https://dane.readthedocs.io/en/latest/intro.html#configuration 
 It is however noteable that, because all DANE components are expected to rely on it, some of the DANE-server, ElasticSearch and RabbitMQ configuration 
 are included in the default config. As such it is recommended that you create a `$HOME/.dane/config.yml` or `$DANE_HOME/config.yml` which contain machine-wide settings for how to connect to these services, which involves specifying the following settings:
 
@@ -41,7 +41,7 @@ The values given here are the default values.
 
 Examples of how to use DANE can be found in the `examples/` directory.
 
-### Local Development
+## Local Development
 
 We moved from `setup.py` & `requirements.txt` to a single `pyproject.toml`. For local builds and publishing we use [poetry](https://python-poetry.org/).
 
@@ -74,4 +74,18 @@ or with poetry
 
 ```bash
 poetry add path_to_dane_wheel_file
+```
+
+### Breaking changes after 0.3.1 
+
+Since version 0.3.1 DANE must be imported in lowercase letters:
+
+```python
+import dane
+```
+
+Before version 0.3.1 you should import using uppercase letters:
+
+```python
+import DANE
 ```
