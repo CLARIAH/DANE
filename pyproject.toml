@@ -30,6 +30,7 @@ pika = "^1.2.1"
 yacs = "^0.1.8"
 
 [tool.poetry.dev-dependencies]
+requests = "^2.27.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

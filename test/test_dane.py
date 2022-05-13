@@ -1,6 +1,6 @@
 import unittest
 import sys
-sys.path.append('../examples/')
+sys.path.append('./examples')
 from dummyhandler import DummyHandler
 from yacs.config import CfgNode
 import os
@@ -9,6 +9,9 @@ from importlib import reload
 from dane import Document, Task
 import dane.config
 
+
+# Run this test file from the root dir: python -m test.test_dane
+# TODO unit tests should be completely rewritten
 class TestDocument(unittest.TestCase):
 
     def setUp(self):
