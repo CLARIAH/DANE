@@ -1,4 +1,4 @@
-from DANE.handlers import base_handler
+from dane.handlers import base_handler
 import uuid
 
 class DummyHandler(base_handler):

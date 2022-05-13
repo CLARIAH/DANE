@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "DANE"
+version = "0.3.1"
+description = "Utils for working with the Distributed Annotation and Enrichment system"
+readme = "README.md"
+authors = [
+    "Nanne van Noord <n.j.e.vannoord@uva.nl>",
+    "jblom <jblom@beeldengeluid.nl>"
+]
+license = "Apache License 2.0"
+repository = "https://github.com/CLARIAH/DANE"
+classifiers=[
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+packages = [
+    { include = "dane" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+elasticsearch7 = "^7.17.3"
+pika = "^1.2.1"
+yacs = "^0.1.8"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

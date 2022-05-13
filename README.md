@@ -7,7 +7,7 @@ This repository contains contains the building blocks for with DANE, such as cre
 
 This package can be installed through pip:
 
-    pip install DANE
+    pip install dane
 
 ### Configuration
 

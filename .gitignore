@@ -7,3 +7,5 @@ config.yml
 *.egg-info
 docs/_build/
 .ipynb_checkpoints/
+.pypirc
+poetry.lock

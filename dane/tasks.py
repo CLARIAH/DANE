@@ -16,7 +16,7 @@
 import json
 import sys
 from abc import ABC, abstractmethod
-import DANE.errors
+from dane.errors import APIRegistrationError, MissingEndpointError
 from collections.abc import Iterable
 
 class Task():
@@ -68,9 +68,9 @@ class Task():
         :return: self
         """
         if self._id is not None:
-            raise DANE.errors.APIRegistrationError('Task already assigned')
+            raise APIRegistrationError('Task already assigned')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+            raise MissingEndpointError('No endpoint found to'\
                     ' assign task')
 
         self = self.api.assignTask(task=self, document_id=document_id)
@@ -81,10 +81,10 @@ class Task():
         Requires an API to be set.
         """
         if self._id is not None:
-            raise DANE.errors.APIRegistrationError('Cannot call assignMany'\
+            raise APIRegistrationError('Cannot call assignMany'\
                     ' on an assigned task')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+            raise MissingEndpointError('No endpoint found to'\
                     ' assign task')
 
         if not isinstance(document_ids, Iterable) \
@@ -109,10 +109,10 @@ class Task():
         :return: self
         """
         if self._id is None:
-            raise DANE.errors.APIRegistrationError('Cannot run an unassigned'\
+            raise APIRegistrationError('Cannot run an unassigned'\
                     'task')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found'\
+            raise MissingEndpointError('No endpoint found'\
                     'to perform task')
 
         self.api.run(task_id = self._id)
@@ -128,10 +128,10 @@ class Task():
         :return: self
         """
         if self._id is None:
-            raise DANE.errors.APIRegistrationError('Cannot retry an '\
+            raise APIRegistrationError('Cannot retry an '\
                     'unassigned task')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found'\
+            raise MissingEndpointError('No endpoint found'\
                     'to perform task')
 
         self.api.retry(task_id = self._id, force=force)
@@ -147,10 +147,10 @@ class Task():
         :return: self
         """
         if self._id is None:
-            raise DANE.errors.APIRegistrationError('Cannot retry an '\
+            raise APIRegistrationError('Cannot retry an '\
                     'unassigned task')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found'\
+            raise MissingEndpointError('No endpoint found'\
                     'to perform task')
 
         self.api.updateTaskState(self._id, 201, 'Reset')
@@ -164,10 +164,10 @@ class Task():
         :return: self
         """
         if self._id is None:
-            raise DANE.errors.APIRegistrationError('Cannot refresh an '\
+            raise APIRegistrationError('Cannot refresh an '\
                     'unassigned task')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+            raise MissingEndpointError('No endpoint found to'\
                     'refresh task')
 
         task = self.api.taskFromTaskId(self._id)
@@ -188,10 +188,10 @@ class Task():
             return self.state == 200
 
         if self._id is None:
-            raise DANE.errors.APIRegistrationError('Cannot check doneness of an'\
+            raise APIRegistrationError('Cannot check doneness of an'\
                     'unassigned task')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found to check'\
+            raise MissingEndpointError('No endpoint found to check'\
                     'task doneness against')
 
         return self.api.isDone(task_id = self._id)
@@ -206,10 +206,10 @@ class Task():
             return self.state
 
         if self._id is None:
-            raise DANE.errors.APIRegistrationError('Cannot get state of an'\
+            raise APIRegistrationError('Cannot get state of an'\
                     'unassigned task')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found to get'\
+            raise MissingEndpointError('No endpoint found to get'\
                     'task state from')
 
         return self.api.getTaskState(task_id = self._id)
@@ -257,12 +257,12 @@ class Task():
 
     @staticmethod
     def from_json(task_str):
-        """Constructs a :class:`DANE.Task` instance from a JSON string
+        """Constructs a :class:`Task` instance from a JSON string
 
-        :param task_str: Serialised :class:`DANE.Task`
+        :param task_str: Serialised :class:`Task`
         :type task_str: str or dict
         :return: An initialised Task
-        :rtype: :class:`DANE.Task`
+        :rtype: :class:`Task`
         """
 
         if isinstance(task_str, str):
@@ -271,18 +271,18 @@ class Task():
         if isinstance(task_str, dict) and len(task_str) == 1:
             cls, params = list(task_str.items())[0]
             if cls.lower() == 'key':
-                task = DANE.Task(key=params)
+                task = Task(key=params)
             elif cls.lower() == 'task':
-                task = DANE.Task(**params)
+                task = Task(**params)
             else: 
                 raise TypeError(
                         "{} must be Task subclass".format(task_str))
         elif "task" in task_str.keys():
             task_str = {**task_str['task'], **task_str }
             del task_str['task']
-            task = DANE.Task(**task_str)
+            task = Task(**task_str)
         else:
-            task = DANE.Task(**task_str)
+            task = Task(**task_str)
 
         return task
 

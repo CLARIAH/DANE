@@ -1,7 +1,7 @@
-from DANE.base_classes import base_worker
+from dane.base_classes import base_worker
 from os.path import getsize, exists
 import json
-from DANE.config import cfg
+from dane.config import cfg
 
 class filesize_worker(base_worker):
     # we specify a queue name because every worker of this type should 

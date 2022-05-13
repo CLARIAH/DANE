@@ -16,7 +16,7 @@
 import json
 import sys
 from abc import ABC, abstractmethod
-import DANE.errors
+import dane.errors
 from collections.abc import Iterable
 
 INDEX = 'dane-index' # TODO read from config
@@ -97,12 +97,12 @@ class Result():
 
     @staticmethod
     def from_json(json_str):
-        """Constructs a :class:`DANE.Result` instance from a JSON string
+        """Constructs a :class:`dane.Result` instance from a JSON string
 
-        :param task_str: Serialised :class:`DANE.Result`
+        :param task_str: Serialised :class:`dane.Result`
         :type task_str: str or dict
         :return: An initialised Result
-        :rtype: :class:`DANE.Result`
+        :rtype: :class:`dane.Result`
         """
 
         data = json.loads(json_str)

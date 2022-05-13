@@ -1,8 +1,8 @@
 import pika
 import uuid
 import json
-import DANE 
-from DANE.config import cfg
+from dane import Document, Task
+from dane.config import cfg
 
 class filesize_server():
 
@@ -35,8 +35,8 @@ class filesize_server():
         self.channel.stop_consuming()
 
     def simulate_request(self):
-        task = DANE.Task('FILESIZE')
-        document = DANE.Document(
+        task = Task('FILESIZE')
+        document = Document(
             {
                 'id': 'THIS',
                 'url': 'filesize_request_generator.py',
