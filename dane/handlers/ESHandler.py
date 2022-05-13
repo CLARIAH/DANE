@@ -13,9 +13,9 @@
 # limitations under the License.
 ##############################################################################
 
-from elasticsearch import Elasticsearch
-from elasticsearch import exceptions as EX
-from elasticsearch import helpers
+from elasticsearch7 import Elasticsearch
+from elasticsearch7 import exceptions as EX
+from elasticsearch7 import helpers
 import json
 import os
 import logging
@@ -24,13 +24,20 @@ from urllib.parse import urlsplit
 import hashlib
 import datetime
 
-import DANE
-from DANE import handlers
+from dane import Document, Task, Result
+from dane.handlers import base_handler
+from dane.errors import(
+  DocumentExistsError, 
+  UnregisteredError, 
+  TaskAssignedError,
+  TaskExistsError,
+  ResultExistsError
+)
 import threading
 
 logger = logging.getLogger('DANE')
 
-class ESHandler(handlers.base_handler):
+class ESHandler(base_handler):
 
     def __init__(self, config, queue=None):
         super().__init__(config)
@@ -146,7 +153,7 @@ class ESHandler(handlers.base_handler):
             res = self.es.index(index=self.INDEX, body=json.dumps(doc),
                     id=_id, refresh=True, op_type='create')
         except EX.ConflictError as e:
-            raise DANE.errors.DocumentExistsError('A document with target.id `{}`, '\
+            raise DocumentExistsError('A document with target.id `{}`, '\
                     'and creator.id `{}` already exists'.format(
                         document.target['id'],
                         document.creator['id']))
@@ -210,7 +217,7 @@ class ESHandler(handlers.base_handler):
     def deleteDocument(self, document):
         if document._id is None:
             logger.error("Can only delete registered documents")
-            raise DANE.errors.UnregisteredError("Failed to delete unregistered document")
+            raise UnregisteredError("Failed to delete unregistered document")
 
         try:
             # delete tasks assigned to this document first,
@@ -279,7 +286,7 @@ class ESHandler(handlers.base_handler):
         
     def assignTask(self, task, document_id):
         if not self.es.get(index=self.INDEX, id=document_id)['found']:
-            raise DANE.errors.DocumentExistsError('No document with id `{}` found'.format(
+            raise DocumentExistsError('No document with id `{}` found'.format(
                 document_id))
 
         _id = hashlib.sha1(
@@ -300,7 +307,7 @@ class ESHandler(handlers.base_handler):
                     id=_id,
                     refresh=True, op_type='create')
         except EX.ConflictError as e:
-            raise DANE.errors.TaskAssignedError('Task `{}` '\
+            raise TaskAssignedError('Task `{}` '\
                     'already assigned to document `{}`'.format(
                         task.key,
                         document_id))
@@ -472,11 +479,11 @@ class ESHandler(handlers.base_handler):
             # hacky way to pass _id to Task
             result['hits']['hits'][0]['_source']['task']['_id'] = \
                     result['hits']['hits'][0]['_id']
-            task = DANE.Task.from_json(result['hits']['hits'][0]['_source'])
+            task = Task.from_json(result['hits']['hits'][0]['_source'])
             task.set_api(self)
             return task
         else:
-            raise DANE.errors.TaskExistsError("No result for task id: {}".format(task_id))
+            raise TaskExistsError("No result for task id: {}".format(task_id))
 
     def getTaskState(self, task_id):
         return int(self.taskFromTaskId(task_id).state)
@@ -499,11 +506,11 @@ class ESHandler(handlers.base_handler):
 
         if result['found']:
             result['_source']['_id'] = result['_id']
-            document = DANE.Document.from_json(json.dumps(result['_source']))
+            document = Document.from_json(json.dumps(result['_source']))
             document.set_api(self)
             return document
         else:
-            raise DANE.errors.DocumentExistsError("No result for given document id")
+            raise DocumentExistsError("No result for given document id")
 
     def documentFromTaskId(self, task_id):
         query = {
@@ -534,12 +541,12 @@ class ESHandler(handlers.base_handler):
             result['hits']['hits'][0]['_source']['_id'] = \
                     result['hits']['hits'][0]['_id']
 
-            document = DANE.Document.from_json(json.dumps(
+            document = Document.from_json(json.dumps(
                 result['hits']['hits'][0]['_source']))
             document.set_api(self)
             return document
         else:
-            raise DANE.errors.TaskExistsError("No result for given task id")
+            raise TaskExistsError("No result for given task id")
 
     ## Result functions
     def registerResult(self, result, task_id):
@@ -604,9 +611,9 @@ class ESHandler(handlers.base_handler):
             res = { '_id': result['hits']['hits'][0]['_id'] }
             res = { **res, **result['hits']['hits'][0]['_source']['result']}
 
-            return DANE.Result.from_json(json.dumps(res))
+            return Result.from_json(json.dumps(res))
         else:
-            raise DANE.errors.ResultExistsError("No result for given result_id")
+            raise ResultExistsError("No result for given result_id")
 
     def searchResult(self, document_id, task_key):
         # find tasks of type task_key below this document
@@ -674,13 +681,13 @@ class ESHandler(handlers.base_handler):
                     r = { '_id': res['_id'] }
                     r = { **r, **res['_source']['result']}
 
-                    found.append(DANE.Result.from_json(json.dumps(r)))
+                    found.append(Result.from_json(json.dumps(r)))
                 return found
             else:
-                raise DANE.errors.ResultExistsError("No result found for {} assigned to {}".format(
+                raise ResultExistsError("No result found for {} assigned to {}".format(
                     task_key, document_id))
         else:
-            raise DANE.errors.TaskAssignedError("Task {} has not been assigned to document {}".format(
+            raise TaskAssignedError("Task {} has not been assigned to document {}".format(
                 task_key, document_id))
 
     def _run(self, task):
@@ -742,10 +749,10 @@ class ESHandler(handlers.base_handler):
 
                     for dep in dependencies:
                         if isinstance(dep, dict):
-                            td = DANE.Task.from_json(dep)
+                            td = Task.from_json(dep)
                             td.set_api(self)
                         else:
-                            td = DANE.Task(dep, api=self)
+                            td = Task(dep, api=self)
                         td.assign(doc._id)
                         self.run(td._id)
             elif state != 200:
@@ -770,7 +777,7 @@ class ESHandler(handlers.base_handler):
                             (at['state'] == 412 and state != 412))): 
                     self.run(at['_id']) 
 
-        except DANE.errors.TaskExistsError as e:
+        except TaskExistsError as e:
             logger.exception('Callback on non-existing task')
         except Exception as e:
             logger.exception('Unhandled error during callback')
@@ -817,7 +824,7 @@ class ESHandler(handlers.base_handler):
         ret = []
         for doc in res['hits']['hits']:
             doc['_source']['_id'] = doc['_id']
-            d = DANE.Document.from_json(doc['_source'])
+            d = Document.from_json(doc['_source'])
             ret.append(json.loads(d.to_json()))
 
         return ret, res['hits']['total']['value'] 
@@ -878,7 +885,7 @@ class ESHandler(handlers.base_handler):
             ret = []
             for t in result['hits']['hits']:
                 t['_source']['task']['_id'] = t['_id']
-                task = DANE.Task.from_json(t['_source'])
+                task = Task.from_json(t['_source'])
                 ret.append(json.loads(task.to_json()))
             return ret
         else:
@@ -923,7 +930,7 @@ class ESHandler(handlers.base_handler):
             ret = []
             for t in result['hits']['hits']:
                 t['_source']['task']['_id'] = t['_id']
-                task = DANE.Task.from_json(t['_source'])
+                task = Task.from_json(t['_source'])
                 ret.append(json.loads(task.to_json()))
             return ret
         else:

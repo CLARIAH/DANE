@@ -16,7 +16,7 @@
 from yacs.config import CfgNode as CN
 import os, sys, inspect
 import inspect
-import DANE.errors as errors
+from dane.errors import ConfigRequiredError
 
 __all__ = ["cfg"]
 
@@ -96,7 +96,7 @@ if os.path.exists(os.path.join(os.getcwd(), "config.yml")):
 elif cfg.CONFIG.REQUIRED:
     # base_config has indicated it requires a config.yml
     # as it wont or shouldnt run with default parameters.
-    raise errors.ConfigRequiredError(
+    raise ConfigRequiredError(
     "A config.yml is required that configures this component. " \
     "Please refer to https://dane.readthedocs.io/en/latest/intro.html#configuration "\
     "for more information.")

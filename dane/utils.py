@@ -16,7 +16,7 @@
 import json
 import sys
 import subprocess
-import DANE
+import dane
 
 def get_git_revision():
     try:

@@ -1,18 +1,21 @@
 import unittest
-import DANE
 import sys
-sys.path.append('../examples/')
+sys.path.append('./examples')
 from dummyhandler import DummyHandler
 from yacs.config import CfgNode
 import os
 from tempfile import TemporaryDirectory
 from importlib import reload
-import DANE.config
+from dane import Document, Task
+import dane.config
 
+
+# Run this test file from the root dir: python -m test.test_dane
+# TODO unit tests should be completely rewritten
 class TestDocument(unittest.TestCase):
 
     def setUp(self):
-        self.doc = DANE.Document(
+        self.doc = Document(
             {
                 'id': 'TEST123',
                 'url': 'http://127.0.0.1/example',
@@ -29,8 +32,8 @@ class TestDocument(unittest.TestCase):
         serialised = self.doc.to_json()
         self.assertIsInstance(serialised, str)
 
-        new_doc = DANE.Document.from_json(serialised)
-        self.assertIsInstance(new_doc, DANE.Document)
+        new_doc = Document.from_json(serialised)
+        self.assertIsInstance(new_doc, Document)
 
         self.assertEqual(self.doc.target['id'], new_doc.target['id'])
         self.assertEqual(self.doc.creator['id'], new_doc.creator['id'])
@@ -46,11 +49,11 @@ class TestDocument(unittest.TestCase):
 class TestTask(unittest.TestCase):
 
     def setUp(self):
-        self.task = DANE.Task('TEST')
+        self.task = Task('TEST')
         self.dummy = DummyHandler()
         
         # depend on doc being able to register for testing tasks
-        self.doc = DANE.Document(
+        self.doc = Document(
             {
                 'id': 'TEST123',
                 'url': 'http://127.0.0.1/example',
@@ -68,8 +71,8 @@ class TestTask(unittest.TestCase):
         serialised = self.task.to_json()
         self.assertIsInstance(serialised, str)
 
-        new_task = DANE.Task.from_json(serialised)
-        self.assertIsInstance(new_task, DANE.Task)
+        new_task = Task.from_json(serialised)
+        self.assertIsInstance(new_task, Task)
 
         self.assertEqual(self.task.key, new_task.key)
         self.assertEqual(self.task.priority, new_task.priority)
@@ -93,8 +96,8 @@ class TestConfig(unittest.TestCase):
             del os.environ['DANE_HOME']
 
     def test_import_config(self):
-        reload(DANE.config)
-        cfg = DANE.config.cfg
+        reload(dane.config)
+        cfg = dane.config.cfg
         
         self.assertIsInstance(cfg, CfgNode)
         self.assertIsInstance(cfg.DANE, CfgNode)
@@ -104,8 +107,8 @@ class TestConfig(unittest.TestCase):
             f.write('TEST:\n')
             f.write('  SCOPE: "LOCAL"\n')
 
-        reload(DANE.config)
-        cfg = DANE.config.cfg
+        reload(dane.config)
+        cfg = dane.config.cfg
 
         self.assertIsInstance(cfg.TEST, CfgNode)
         self.assertEqual(cfg.TEST.SCOPE, "LOCAL")
@@ -117,8 +120,8 @@ class TestConfig(unittest.TestCase):
                 f.write('TEST:\n')
                 f.write('  SCOPE: "GLOBAL"\n')
 
-            reload(DANE.config)
-            cfg = DANE.config.cfg
+            reload(dane.config)
+            cfg = dane.config.cfg
 
             self.assertIsInstance(cfg.TEST, CfgNode)
             self.assertEqual(cfg.TEST.SCOPE, "GLOBAL")

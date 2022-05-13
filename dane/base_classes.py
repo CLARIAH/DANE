@@ -13,9 +13,10 @@
 # limitations under the License.
 ##############################################################################
 
-import DANE
-import DANE.utils
-from DANE.handlers import ESHandler
+from dane import Task, Document
+from dane.utils import cwd_is_git, get_git_revision, get_git_remote
+from dane.errors import RefuseJobException, ResourceConnectionError
+from dane.handlers import ESHandler
 from abc import ABC, abstractmethod
 import pika
 import json
@@ -71,12 +72,12 @@ class base_worker(ABC):
         self.depends_on = depends_on
         self._connected = False
 
-        if DANE.utils.cwd_is_git():
+        if cwd_is_git():
         # if the cwd is a git repo we can prefill the generator dict
-            self.generator = { 'id': DANE.utils.get_git_revision(),
+            self.generator = { 'id': get_git_revision(),
                     "type": "Software",
                     "name": self.queue,
-                    "homepage": DANE.utils.get_git_remote()}
+                    "homepage": get_git_remote()}
         else:
             self.generator = None
 
@@ -135,7 +136,7 @@ class base_worker(ABC):
                     continue
                 self._callback(self.channel, method, props, body)
         else:
-            raise DANE.errors.ResourceConnectionError('Not connected to AMQ')
+            raise ResourceConnectionError('Not connected to AMQ')
 
     def stop(self):
         """Stop listening for tasks to be executed.
@@ -143,7 +144,7 @@ class base_worker(ABC):
         if self._connected:
             self._is_interrupted = True
         else:
-            raise DANE.errors.ResourceConnectionError('Not connected to AMQ')
+            raise ResourceConnectionError('Not connected to AMQ')
 
     def _callback(self, ch, method, props, body):
         try:
@@ -152,8 +153,8 @@ class base_worker(ABC):
                 raise KeyError(('Incompleted task specification, '
                     'require both `task` and `document` information'))
 
-            task = DANE.Task(**body['task'])
-            doc = DANE.Document(**body['document'], api=self.handler)
+            task = Task(**body['task'])
+            doc = Document(**body['document'], api=self.handler)
 
             done = True # assume assigned are done, unless find otherwise
             if len(self.depends_on) > 0:
@@ -206,7 +207,7 @@ class base_worker(ABC):
     def _run(self, task, doc, ch, method, props):
         try:
             response = self.callback(task, doc)
-        except DANE.errors.RefuseJobException:
+        except RefuseJobException:
             # worker doesnt want the job yet, nack it
             nack = functools.partial(ch.basic_nack, 
                     delivery_tag=method.delivery_tag)
@@ -241,7 +242,7 @@ class base_worker(ABC):
         output should be stored in response['SHARED']
         
         :param job: The job
-        :type job: :class:`DANE.Job`
+        :type job: :class:`Job`
         :return: Dict with keys `TEMP_FOLDER` and `OUT_FOLDER`
         :rtype: dict
         """
@@ -277,9 +278,9 @@ class base_worker(ABC):
         a worker. 
 
         :param task: Task to be executed
-        :type task: :class:`DANE.Task`
+        :type task: :class:`Task`
         :param document: Document the task is applied to
-        :type document: :class:`DANE.Document`
+        :type document: :class:`Document`
         :return: Task response with the `message`, `state`, and
             optional additional response information
         :rtype: dict

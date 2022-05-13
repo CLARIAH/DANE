@@ -1,4 +1,4 @@
-from DANE.handlers import base_handler
+from dane.handlers import base_handler
 import uuid
 
 class DummyHandler(base_handler):
@@ -15,6 +15,14 @@ class DummyHandler(base_handler):
 
     def deleteDocument(self, document):
         del self.doc_register[document.document_id]
+
+    # Note: added to make test_dane.py work, but does nothing yet
+    def assignTaskToMany(self, task, document_ids):
+        return
+
+    # Note: added to make test_dane.py work, but does nothing yet
+    def registerDocuments(self, documents):
+        return
 
     def assignTask(self, task, document_id):
         if document_id in self.doc_register.keys():

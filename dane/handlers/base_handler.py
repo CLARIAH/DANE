@@ -14,6 +14,7 @@
 ##############################################################################
 
 from abc import ABC, abstractmethod
+from dane import Document, Task, Result
 
 class base_handler(ABC):
     """Abstract base class for a handler. 
@@ -32,7 +33,7 @@ class base_handler(ABC):
         """Register a document in the database
 
         :param document: The document
-        :type document: :class:`DANE.Document`
+        :type document: :class:`Document`
         :return: document_id
         :rtype: int
         """
@@ -43,7 +44,7 @@ class base_handler(ABC):
         """Register list of documents in the database
 
         :param document: The document
-        :type document: :class:`DANE.Document`
+        :type document: :class:`Document`
         :return: two lists with successfully and failed documents, as tuple
         """
         return
@@ -53,7 +54,7 @@ class base_handler(ABC):
         """Delete a document and its underlying tasks from the database
 
         :param document: The document
-        :type document: :class:`DANE.Document`
+        :type document: :class:`Document`
         """
         return
 
@@ -62,7 +63,7 @@ class base_handler(ABC):
         """Assign a task to a document and run it.
 
         :param task: the task to assign
-        :type task: :class:`DANE.Task`
+        :type task: :class:`Task`
         :param document_id: id of the document this task belongs to
         :type document_id: int
         :return: task_id
@@ -75,7 +76,7 @@ class base_handler(ABC):
         """Assign a task to a document and run it.
 
         :param task: the task to assign
-        :type task: :class:`DANE.Task`
+        :type task: :class:`Task`
         :param document_id: list of ids of the documents to assign this to
         :type document_id: [int]
         :return: task_ids
@@ -88,7 +89,7 @@ class base_handler(ABC):
         """Delete a task.
 
         :param task: the task to delete
-        :type task: :class:`DANE.Task`
+        :type task: :class:`Task`
         :return: bool 
         """
         return
@@ -100,7 +101,7 @@ class base_handler(ABC):
         :param task_id: id of the task
         :type task_id: int
         :return: the task, or error if it doesnt exist
-        :rtype: :class:`DANE.Task`
+        :rtype: :class:`Task`
         """
         return
     
@@ -128,23 +129,23 @@ class base_handler(ABC):
 
     @abstractmethod
     def documentFromDocumentId(self, document_id):
-        """Construct and return a :class:`DANE.Document` given a document_id
+        """Construct and return a :class:`Document` given a document_id
         
         :param document_id: The id for the document
         :type document_id: int
         :return: The document
-        :rtype: :class:`DANE.Document`
+        :rtype: :class:`Document`
         """
         return
 
     @abstractmethod
     def documentFromTaskId(self, task_id):
-        """Construct and return a :class:`DANE.Document` given a task_id
+        """Construct and return a :class:`Document` given a task_id
         
         :param task_id: The id of a task
         :type task_id: int
         :return: The document
-        :rtype: :class:`DANE.Document`
+        :rtype: :class:`Document`
         """
         return
 
@@ -153,7 +154,7 @@ class base_handler(ABC):
         """Save a result for a task
         
         :param result: The result
-        :type result: :class:`DANE.Result`
+        :type result: :class:`Result`
         :param task_id: id of the task that generated this result
         :return: self
         """
@@ -164,19 +165,19 @@ class base_handler(ABC):
         """Delete a result
         
         :param result: The result to delete
-        :type result: :class:`DANE.Result`
+        :type result: :class:`Result`
         :return: bool 
         """
         return
 
     @abstractmethod
     def resultFromResultId(self, result_id):
-        """Construct and return a :class:`DANE.Result` given a result_id
+        """Construct and return a :class:`Result` given a result_id
         
         :param result_id: The id of a result
         :type result_id: int
         :return: The result
-        :rtype: :class:`DANE.Result`
+        :rtype: :class:`Result`
         """
 
     @abstractmethod
@@ -186,7 +187,7 @@ class base_handler(ABC):
 
         :param document_id: id of the document the task should be applied to
         :param task_key: key of the task that was applied
-        :return: List of initialised :class:`DANE.Result` 
+        :return: List of initialised :class:`Result` 
         """
 
     def isDone(self, task_id):

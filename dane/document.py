@@ -16,7 +16,7 @@
 import json
 import sys
 from abc import ABC, abstractmethod
-import DANE
+from dane.errors import APIRegistrationError, MissingEndpointError
 from requests.utils import requote_uri
 
 class Document():
@@ -93,12 +93,12 @@ class Document():
 
     @staticmethod
     def from_json(json_str):
-        """Constructs a :class:`DANE.Document` instance from a JSON string
+        """Constructs a :class:`dane.Document` instance from a JSON string
 
-        :param json_str: Serialised :class:`DANE.Document`
+        :param json_str: Serialised :class:`dane.Document`
         :type json_str: str or dict
         :return: JSON string of the document
-        :rtype: :class:`DANE.Document`
+        :rtype: :class:`dane.Document`
         """
 
         if isinstance(json_str, str):
@@ -124,9 +124,9 @@ class Document():
         :return: self
         """
         if self._id is not None:
-            raise DANE.errors.APIRegistrationError('Document already registered')
+            raise APIRegistrationError('Document already registered')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+            raise MissingEndpointError('No endpoint found to'\
                     'register document')
 
         self._id = self.api.registerDocument(document=self)
@@ -137,7 +137,7 @@ class Document():
         """Delete this document. Requires an API to be set.
         """
         if self.api is None:
-            raise DANE.errors.MissingEndpointError('No API found')
+            raise MissingEndpointError('No API found')
 
         return self.api.deleteDocument(document=self)
 
@@ -151,9 +151,9 @@ class Document():
         :return: list of dicts with task keys and ids."""
 
         if self._id is None:
-            raise DANE.errors.APIRegistrationError('Document needs to be registered')
+            raise APIRegistrationError('Document needs to be registered')
         elif self.api is None:
-            raise DANE.errors.MissingEndpointError('No endpoint found to'\
+            raise MissingEndpointError('No endpoint found to'\
                     'query tasks')
 
         return self.api.getAssignedTasks(self._id, task_key)
