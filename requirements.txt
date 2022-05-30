@@ -1,3 +1,0 @@
-DANE
-elasticsearch7
-pika
