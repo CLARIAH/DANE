@@ -186,7 +186,7 @@ class ESHandler(base_handler):
             document.updated_at = doc['_source']['updated_at']
             actions.append(doc)
 
-        succeeded, errors = helpers.bulk(self.es, actions, raise_on_error=False)
+        succeeded, errors = helpers.bulk(self.es, actions, raise_on_error=False, refresh=True)
         logger.debug("Batch registration: Success {} Failed {}".format(
             succeeded, len(errors)))
 
@@ -338,11 +338,11 @@ class ESHandler(base_handler):
             elif d['hits']['total']['value'] == 0:
                 failed.append({'document_id': d_id, 
                         'error': "[404] 'No document with id `{}` found'".format(
-                            document_id)})
+                            d_id)})
             else:
                 failed.append({'document_id': d_id, 
                         'error': "[500] 'Multiple documents found with id `{}`'".format(
-                            document_id)})
+                            d_id)})
         document_ids = docs
         del docs
 
