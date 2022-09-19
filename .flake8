@@ -1,0 +1,51 @@
+# use .flake8 until we can move this config to pyproject.toml
+# https://github.com/PyCQA/flake8/issues/234
+
+[flake8]
+select =
+    # B: bugbear warnings
+    B,
+
+    # B950: bugbear max-linelength warning
+    # as suggested in the black docs
+    # https://github.com/psf/black/blob/d038a24ca200da9dacc1dcb05090c9e5b45b7869/docs/the_black_code_style/current_style.md#line-length
+    B950,
+
+    # C: currently only C901, mccabe code complexity
+    C,
+
+    # E: pycodestyle errors
+    E,
+
+    # F: flake8 codes for pyflakes
+    F,
+
+    # W: pycodestyle warnings
+    W,
+
+extend-ignore =
+    # E203: pycodestyle's "whitespace before ',', ';' or ':'" error
+    # ignored as suggested in the black docs
+    # https://github.com/psf/black/blob/d038a24ca200da9dacc1dcb05090c9e5b45b7869/docs/the_black_code_style/current_style.md#slices
+    E203,
+
+    # E501: pycodestyle's "line too long (82 > 79) characters" error
+    # ignored in favor of B950 as suggested in the black docs
+    # https://github.com/psf/black/blob/d038a24ca200da9dacc1dcb05090c9e5b45b7869/docs/the_black_code_style/current_style.md#line-length
+    E501,
+
+# set max-line-length to be black compatible, as suggested in the black docs
+# https://github.com/psf/black/blob/d038a24ca200da9dacc1dcb05090c9e5b45b7869/docs/the_black_code_style/current_style.md#line-length
+max-line-length = 88
+
+# set max cyclomatic complexity for mccabe plugin
+max-complexity = 10
+
+# show total number of errors, set exit code to 1 if tot is not empty
+count = True
+
+# show the source generating each error or warning
+show-source = True
+
+# count errors and warnings
+statistics = True
