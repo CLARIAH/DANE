@@ -34,6 +34,8 @@ extend-ignore =
     # https://github.com/psf/black/blob/d038a24ca200da9dacc1dcb05090c9e5b45b7869/docs/the_black_code_style/current_style.md#line-length
     E501,
 
+    W503
+
 # set max-line-length to be black compatible, as suggested in the black docs
 # https://github.com/psf/black/blob/d038a24ca200da9dacc1dcb05090c9e5b45b7869/docs/the_black_code_style/current_style.md#line-length
 max-line-length = 88
@@ -49,3 +51,5 @@ show-source = True
 
 # count errors and warnings
 statistics = True
+
+exclude = __init__.py,docs,examples

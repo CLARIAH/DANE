@@ -10,7 +10,7 @@ poetry shell
 cd ../
 
 # run tests (configured in pyproject.toml)
-# pytest
+pytest
 
 # check lint rules (configured in .flake8)
 flake8

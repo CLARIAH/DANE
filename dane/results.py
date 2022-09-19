@@ -1,11 +1,11 @@
 # Copyright 2020-present, Netherlands Institute for Sound and Vision (Nanne van Noord)
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,17 +14,15 @@
 ##############################################################################
 
 import json
-import sys
-from abc import ABC, abstractmethod
-import dane.errors
-from collections.abc import Iterable
 
-INDEX = 'dane-index' # TODO read from config
 
-class Result():
-    """Class representation of a analysis result, containing the outcome and 
-    logic for interacting with DANE-server through a 
-    :class:`base_classes.base_handler`
+INDEX = "dane-index"  # default, override via cfg.ELASTICSEARCH.INDEX
+
+
+class Result:
+    """Class representation of a analysis result, containing the outcome and
+    logic for interacting with DANE-server through a
+    :class:`dane.handlers.base_handler.BaseHandler`
 
     :param generator: Details of analysis that generated this result, requires
         `id`, `name`, `type`, and `homepage` fields.
@@ -36,34 +34,41 @@ class Result():
     """
 
     VALID_AGENTS = ["Organization", "Human", "Software"]
-    
+
     def __init__(self, generator, payload={}, _id=None, api=None):
 
-        if not {"id", "name", "type", "homepage"} <= generator.keys() \
-                and len(generator['id']) > 2:
-            raise KeyError("Generator object must contains at least the `id`," + \
-                    "type, name, and homepage properties")
+        if (
+            not {"id", "name", "type", "homepage"} <= generator.keys()
+            and len(generator["id"]) > 2
+        ):
+            raise KeyError(
+                "Generator object must contains at least the `id`,"
+                + "type, name, and homepage properties"
+            )
 
-        if generator['name'] is None or generator['name'] == '':
+        if generator["name"] is None or generator["name"] == "":
             raise ValueError("Generator name cannot be empty string or None")
-        generator['name'] = generator['name'].upper()
+        generator["name"] = generator["name"].upper()
 
-        if generator['type'] not in self.VALID_AGENTS:
-            raise ValueError("Invalid generator type. Valid types are: {}".format(
-                ", ".join(self.VALID_AGENTS)))
+        if generator["type"] not in self.VALID_AGENTS:
+            raise ValueError(
+                "Invalid generator type. Valid types are: {}".format(
+                    ", ".join(self.VALID_AGENTS)
+                )
+            )
 
         self.generator = generator
         if isinstance(payload, dict):
             self.payload = payload
         else:
-            raise TypeError('Payload must be of type dict')
+            raise TypeError("Payload must be of type dict")
 
         self._id = _id
         self.api = api
 
     def save(self, task_id):
         """Save this result, this will set an _id for the result
-        
+
         :param task_id: id of the task that generated this result
         :return: self
         """
@@ -86,11 +91,11 @@ class Result():
         """
         out = {}
         for kw in vars(self):
-            if kw == '_id' and self._id is None:
+            if kw == "_id" and self._id is None:
                 continue
-            elif kw == 'api':
+            elif kw == "api":
                 continue
-            else: 
+            else:
                 out[kw] = getattr(self, kw)
 
         return json.dumps({"result": out}, indent=indent)

@@ -1,4 +1,5 @@
 from dane.handlers.base_handler import BaseHandler
+from dane.errors import APIRegistrationError
 import uuid
 
 

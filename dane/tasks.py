@@ -1,11 +1,11 @@
 # Copyright 2020-present, Netherlands Institute for Sound and Vision (Nanne van Noord)
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,14 +14,13 @@
 ##############################################################################
 
 import json
-import sys
-from abc import ABC, abstractmethod
 from dane.errors import APIRegistrationError, MissingEndpointError
 from collections.abc import Iterable
 
-class Task():
+
+class Task:
     """Class representation of a task, contains task information and has logic
-    for interacting with DANE-server through a :class:`base_classes.base_handler`
+    for interacting with DANE-server through a :class:`dane.handlers.base_handler.BaseHandler`
 
     :param key: Key of the task, should match a binding key of a worker
     :type key: str
@@ -29,21 +28,32 @@ class Task():
     :type priority: int
     :param _id: id assigned by DANE-server to this task
     :type _id: int, optional
-    :param api: Reference to a :class:`base_classes.base_handler` which is
+    :param api: Reference to a :class:`dane.handlers.base_handler.BaseHandler` which is
         used to communicate with the database, and queueing system.
-    :type api: :class:`base_classes.base_handler`, optional
+    :type api: :class:`dane.handlers.base_handler.BaseHandler`, optional
     :param state: Status code representing task state
     :type state: int, optional
     :param msg: Textual message accompanying the state
     :type msg: str, optional
     :param created_at: Creation date
     :param updated_at: Last modified date
-    :param \**kwargs: Arbitrary keyword arguments. Will be stored in task.args 
+    :param **kwargs: Arbitrary keyword arguments. Will be stored in task.args
     """
-    def __init__(self, key, priority=1, _id = None, api = None, 
-            state=None, msg=None, created_at=None, updated_at=None, **kwargs):
-        if key is None or key == '':
-            raise ValueError("task key cannot be empty string \"\" or None")
+
+    def __init__(
+        self,
+        key,
+        priority=1,
+        _id=None,
+        api=None,
+        state=None,
+        msg=None,
+        created_at=None,
+        updated_at=None,
+        **kwargs,
+    ):
+        if key is None or key == "":
+            raise ValueError('task key cannot be empty string "" or None')
 
         self.key = key.upper()
         self.priority = max(0, min(int(priority), 10))
@@ -55,41 +65,37 @@ class Task():
         self.created_at = created_at
         self.updated_at = updated_at
 
-        if len(kwargs) == 1 and list(kwargs.keys())[0] == 'args':
-            self.args = kwargs['args']
+        if len(kwargs) == 1 and list(kwargs.keys())[0] == "args":
+            self.args = kwargs["args"]
         else:
             self.args = kwargs
 
     def assign(self, document_id):
         """Assign a task to a document, this will set an _id for the
         task and run it. Requires an API to be set.
-        
+
         :param document_id: id of document to assign this task to.
         :return: self
         """
         if self._id is not None:
-            raise APIRegistrationError('Task already assigned')
+            raise APIRegistrationError("Task already assigned")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to'\
-                    ' assign task')
+            raise MissingEndpointError("No endpoint found to" " assign task")
 
         self = self.api.assignTask(task=self, document_id=document_id)
         return self
 
     def assignMany(self, document_ids):
-        """Assign this task to multiple documents and run it. 
+        """Assign this task to multiple documents and run it.
         Requires an API to be set.
         """
         if self._id is not None:
-            raise APIRegistrationError('Cannot call assignMany'\
-                    ' on an assigned task')
+            raise APIRegistrationError("Cannot call assignMany" " on an assigned task")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to'\
-                    ' assign task')
+            raise MissingEndpointError("No endpoint found to" " assign task")
 
-        if not isinstance(document_ids, Iterable) \
-                or isinstance(document_ids, str):
-            raise TypeError('document_ids must be iterable')
+        if not isinstance(document_ids, Iterable) or isinstance(document_ids, str):
+            raise TypeError("document_ids must be iterable")
 
         return self.api.assignTaskToMany(task=self, document_ids=document_ids)
 
@@ -105,36 +111,32 @@ class Task():
 
     def run(self):
         """Run this task, requires it to be registered
-        
+
         :return: self
         """
         if self._id is None:
-            raise APIRegistrationError('Cannot run an unassigned'\
-                    'task')
+            raise APIRegistrationError("Cannot run an unassigned" "task")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found'\
-                    'to perform task')
+            raise MissingEndpointError("No endpoint found" "to perform task")
 
-        self.api.run(task_id = self._id)
+        self.api.run(task_id=self._id)
         return self
 
     def retry(self, force=False):
-        """Try to run this task again. Unlike 
-        :func:`run` this will attempt to run even after  
+        """Try to run this task again. Unlike
+        :func:`run` this will attempt to run even after
         an error state was encountered.
-        
+
         :param force: Force task to rerun regardless of previous state
         :type force: bool, optional
         :return: self
         """
         if self._id is None:
-            raise APIRegistrationError('Cannot retry an '\
-                    'unassigned task')
+            raise APIRegistrationError("Cannot retry an " "unassigned task")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found'\
-                    'to perform task')
+            raise MissingEndpointError("No endpoint found" "to perform task")
 
-        self.api.retry(task_id = self._id, force=force)
+        self.api.retry(task_id=self._id, force=force)
         return self
 
     def reset(self):
@@ -143,32 +145,28 @@ class Task():
         This can be used to force tasks to re-run after a preceding task
         has completed. Typically, the preceding task will be retried with
         `force=True`.
-        
+
         :return: self
         """
         if self._id is None:
-            raise APIRegistrationError('Cannot retry an '\
-                    'unassigned task')
+            raise APIRegistrationError("Cannot retry an " "unassigned task")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found'\
-                    'to perform task')
+            raise MissingEndpointError("No endpoint found" "to perform task")
 
-        self.api.updateTaskState(self._id, 201, 'Reset')
+        self.api.updateTaskState(self._id, 201, "Reset")
         return self
 
     def refresh(self):
-        """Retrieves the latest information for task state and msg which might 
-        have changed their values since the creation of this task. Requires an 
+        """Retrieves the latest information for task state and msg which might
+        have changed their values since the creation of this task. Requires an
         API to be set
 
         :return: self
         """
         if self._id is None:
-            raise APIRegistrationError('Cannot refresh an '\
-                    'unassigned task')
+            raise APIRegistrationError("Cannot refresh an " "unassigned task")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to'\
-                    'refresh task')
+            raise MissingEndpointError("No endpoint found to" "refresh task")
 
         task = self.api.taskFromTaskId(self._id)
         self.state = task.state
@@ -176,7 +174,7 @@ class Task():
         return self
 
     def isDone(self):
-        """ Check if this task has been completed. 
+        """Check if this task has been completed.
 
         A task is completed if it's `state` equals 200. This will
         consult the API if the state isn't set.
@@ -188,38 +186,36 @@ class Task():
             return self.state == 200
 
         if self._id is None:
-            raise APIRegistrationError('Cannot check doneness of an'\
-                    'unassigned task')
+            raise APIRegistrationError("Cannot check doneness of an" "unassigned task")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to check'\
-                    'task doneness against')
+            raise MissingEndpointError(
+                "No endpoint found to check" "task doneness against"
+            )
 
-        return self.api.isDone(task_id = self._id)
+        return self.api.isDone(task_id=self._id)
 
     def state(self):
-        """ Get task state of this task. 
+        """Get task state of this task.
 
-        :return: Task state 
+        :return: Task state
         :rtype: int
         """
         if self.state is not None:
             return self.state
 
         if self._id is None:
-            raise APIRegistrationError('Cannot get state of an'\
-                    'unassigned task')
+            raise APIRegistrationError("Cannot get state of an" "unassigned task")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to get'\
-                    'task state from')
+            raise MissingEndpointError("No endpoint found to get" "task state from")
 
-        return self.api.getTaskState(task_id = self._id)
+        return self.api.getTaskState(task_id=self._id)
 
     def set_api(self, api):
         """Set the API for this task
 
-        :param api: Reference to a :class:`base_classes.base_handler` which is
+        :param api: Reference to a :class:`dane.handlers.base_handler.BaseHandler` which is
             used to communicate with the database, and queueing system.
-        :type api: :class:`base_classes.base_handler`, optional
+        :type api: :class:`dane.handlers.base_handler.BaseHandler`, optional
         :return: self
         """
         self.api = api
@@ -241,18 +237,20 @@ class Task():
         :return: JSON serialisation of the task
         :rtype: str
         """
-        task_data = { "key": self.key.upper(),
-                "_id": self._id,
-                "state": self.state,
-                "msg": self.msg,
-                "created_at": self.created_at,
-                "updated_at": self.updated_at,
-                "priority": self.priority}
+        task_data = {
+            "key": self.key.upper(),
+            "_id": self._id,
+            "state": self.state,
+            "msg": self.msg,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "priority": self.priority,
+        }
 
         if len(self.args) > 0:
-            task_data['args'] = self.args
+            task_data["args"] = self.args
 
-        out = { k:v for k,v in task_data.items() if v is not None}
+        out = {k: v for k, v in task_data.items() if v is not None}
         return json.dumps(out, indent=indent)
 
     @staticmethod
@@ -270,16 +268,15 @@ class Task():
 
         if isinstance(task_str, dict) and len(task_str) == 1:
             cls, params = list(task_str.items())[0]
-            if cls.lower() == 'key':
+            if cls.lower() == "key":
                 task = Task(key=params)
-            elif cls.lower() == 'task':
+            elif cls.lower() == "task":
                 task = Task(**params)
-            else: 
-                raise TypeError(
-                        "{} must be Task subclass".format(task_str))
+            else:
+                raise TypeError("{} must be Task subclass".format(task_str))
         elif "task" in task_str.keys():
-            task_str = {**task_str['task'], **task_str }
-            del task_str['task']
+            task_str = {**task_str["task"], **task_str}
+            del task_str["task"]
             task = Task(**task_str)
         else:
             task = Task(**task_str)
@@ -290,5 +287,12 @@ class Task():
         return self.to_json()
 
     def __copy__(self):
-        return Task(self.key, self.priority, self._id, 
-                self.api, self.state, self.msg, **self.args)
+        return Task(
+            self.key,
+            self.priority,
+            self._id,
+            self.api,
+            self.state,
+            self.msg,
+            **self.args,
+        )

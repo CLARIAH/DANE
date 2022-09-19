@@ -1,11 +1,11 @@
 # Copyright 2020-present, Netherlands Institute for Sound and Vision (Nanne van Noord)
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,13 +14,12 @@
 ##############################################################################
 
 import json
-import sys
-from abc import ABC, abstractmethod
 from dane.errors import APIRegistrationError, MissingEndpointError
 from requests.utils import requote_uri
 
-class Document():
-    """This is a class representation of a document in DANE, it holds both data 
+
+class Document:
+    """This is a class representation of a document in DANE, it holds both data
     and some logic.
 
     :param target: Dict containing `id`, `url`, and `type` keys to described
@@ -29,9 +28,9 @@ class Document():
     :param creator: Dict containing `id`, and `type` keys to describe the
         document owner/creator.
     :type creator: dict
-    :param api: Reference to a class:`base_classes.base_handler` which is
+    :param api: Reference to a class:`dane.handlers.base_handler.BaseHandler` which is
         used to communicate with the server.
-    :type api: :class:`base_classes.base_handler`, optional
+    :type api: :class:`dane.handlers.base_handler.BaseHandler`, optional
     :param _id: ID of the document, assigned by DANE-server
     :type _id: int, optional
     :param created_at: Creation date
@@ -41,27 +40,38 @@ class Document():
     VALID_TYPES = ["Dataset", "Image", "Video", "Sound", "Text"]
     VALID_AGENTS = ["Organization", "Human", "Software"]
 
-    def __init__(self, target, creator, api=None, _id=None, 
-            created_at=None, updated_at=None):
-        
-        if not {"id", "url", "type"} <= target.keys() and len(target['id']) > 2:
-            raise KeyError("Target object must contains at least the `id`," + \
-                    "url, and type properties")
+    def __init__(
+        self, target, creator, api=None, _id=None, created_at=None, updated_at=None
+    ):
 
-        if target['type'] not in self.VALID_TYPES:
-            raise ValueError("Invalid target type. Valid types are: {}".format(
-                ", ".join(self.VALID_TYPES)))
+        if not {"id", "url", "type"} <= target.keys() and len(target["id"]) > 2:
+            raise KeyError(
+                "Target object must contains at least the `id`,"
+                + "url, and type properties"
+            )
+
+        if target["type"] not in self.VALID_TYPES:
+            raise ValueError(
+                "Invalid target type. Valid types are: {}".format(
+                    ", ".join(self.VALID_TYPES)
+                )
+            )
 
         self.target = target
-        self.target['url'] = requote_uri(str(self.target['url']).strip())
+        self.target["url"] = requote_uri(str(self.target["url"]).strip())
 
         if not {"id", "type"} <= creator.keys():
-            raise KeyError("Creator object must contains at least the `id` " + \
-                    "and type properties")
+            raise KeyError(
+                "Creator object must contains at least the `id` "
+                + "and type properties"
+            )
 
-        if creator['type'] not in self.VALID_AGENTS:
-            raise ValueError("Invalid creator type. Valid types are: {}".format(
-                ", ".join(self.VALID_AGENTS)))
+        if creator["type"] not in self.VALID_AGENTS:
+            raise ValueError(
+                "Invalid creator type. Valid types are: {}".format(
+                    ", ".join(self.VALID_AGENTS)
+                )
+            )
 
         self.creator = creator
 
@@ -82,11 +92,11 @@ class Document():
         """
         out = {}
         for kw in vars(self):
-            if kw == 'api':
+            if kw == "api":
                 continue
-            elif kw == '_id' and self._id is None:
+            elif kw == "_id" and self._id is None:
                 continue
-            else: 
+            else:
                 out[kw] = getattr(self, kw)
 
         return json.dumps(out, indent=indent)
@@ -109,9 +119,9 @@ class Document():
     def set_api(self, api):
         """Set the API for the document
 
-        :param api: Reference to a :class:`base_classes.base_handler` which is
+        :param api: Reference to a :class:`dane.handlers.base_handler.BaseHandler` which is
             used to communicate with the database, and queueing system.
-        :type api: :class:`base_classes.base_handler`, optional
+        :type api: :class:`dane.handlers.base_handler.BaseHandler`, optional
         :return: self
         """
         self.api = api
@@ -124,24 +134,22 @@ class Document():
         :return: self
         """
         if self._id is not None:
-            raise APIRegistrationError('Document already registered')
+            raise APIRegistrationError("Document already registered")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to'\
-                    'register document')
+            raise MissingEndpointError("No endpoint found to" "register document")
 
         self._id = self.api.registerDocument(document=self)
 
         return self
 
     def delete(self):
-        """Delete this document. Requires an API to be set.
-        """
+        """Delete this document. Requires an API to be set."""
         if self.api is None:
-            raise MissingEndpointError('No API found')
+            raise MissingEndpointError("No API found")
 
         return self.api.deleteDocument(document=self)
 
-    def getAssignedTasks(self, task_key = None):
+    def getAssignedTasks(self, task_key=None):
         """Retrieve tasks assigned to this document. Accepts an optional
         task_key to filter for a specific type of tasks. Requires an
         API to be set.
@@ -151,9 +159,8 @@ class Document():
         :return: list of dicts with task keys and ids."""
 
         if self._id is None:
-            raise APIRegistrationError('Document needs to be registered')
+            raise APIRegistrationError("Document needs to be registered")
         elif self.api is None:
-            raise MissingEndpointError('No endpoint found to'\
-                    'query tasks')
+            raise MissingEndpointError("No endpoint found to" "query tasks")
 
         return self.api.getAssignedTasks(self._id, task_key)

@@ -1,11 +1,11 @@
 # Copyright 2020-present, Netherlands Institute for Sound and Vision (Nanne van Noord)
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,17 +14,18 @@
 ##############################################################################
 
 from abc import ABC, abstractmethod
-from dane import Document, Task, Result
 
-class base_handler(ABC):
-    """Abstract base class for a handler. 
+
+class BaseHandler(ABC):
+    """Abstract base class for a handler.
 
     A handler functions as the API used in DANE to facilitate all communication
-    with the database and the queueing system. 
-    
+    with the database and the queueing system.
+
     :param config: Config settings for the handler
     :type config: dict
     """
+
     def __init__(self, config):
         self.config = config
 
@@ -90,7 +91,7 @@ class base_handler(ABC):
 
         :param task: the task to delete
         :type task: :class:`Task`
-        :return: bool 
+        :return: bool
         """
         return
 
@@ -104,7 +105,7 @@ class base_handler(ABC):
         :rtype: :class:`Task`
         """
         return
-    
+
     @abstractmethod
     def getTaskState(self, task_id):
         """Retrieve state for a given task_id
@@ -130,7 +131,7 @@ class base_handler(ABC):
     @abstractmethod
     def documentFromDocumentId(self, document_id):
         """Construct and return a :class:`Document` given a document_id
-        
+
         :param document_id: The id for the document
         :type document_id: int
         :return: The document
@@ -141,7 +142,7 @@ class base_handler(ABC):
     @abstractmethod
     def documentFromTaskId(self, task_id):
         """Construct and return a :class:`Document` given a task_id
-        
+
         :param task_id: The id of a task
         :type task_id: int
         :return: The document
@@ -152,7 +153,7 @@ class base_handler(ABC):
     @abstractmethod
     def registerResult(self, result, task_id):
         """Save a result for a task
-        
+
         :param result: The result
         :type result: :class:`Result`
         :param task_id: id of the task that generated this result
@@ -163,17 +164,17 @@ class base_handler(ABC):
     @abstractmethod
     def deleteResult(self, result):
         """Delete a result
-        
+
         :param result: The result to delete
         :type result: :class:`Result`
-        :return: bool 
+        :return: bool
         """
         return
 
     @abstractmethod
     def resultFromResultId(self, result_id):
         """Construct and return a :class:`Result` given a result_id
-        
+
         :param result_id: The id of a result
         :type result_id: int
         :return: The result
@@ -187,14 +188,14 @@ class base_handler(ABC):
 
         :param document_id: id of the document the task should be applied to
         :param task_key: key of the task that was applied
-        :return: List of initialised :class:`Result` 
+        :return: List of initialised :class:`Result`
         """
 
     def isDone(self, task_id):
         """Verify whether a task is done.
 
         Doneness is determined by whether or not its state is `200`.
-        
+
         :param task_id: The id of a task
         :type task_id: int
         :return: Task doneness
@@ -209,7 +210,7 @@ class base_handler(ABC):
         Running a task involves submitting it to a queue, so results might
         only be available much later. Expects a task to have state `201`,
         and it may retry tasks with state `502` or `503`.
-        
+
         :param task_id: The id of a task
         :type task_id: int
         """
@@ -222,7 +223,7 @@ class base_handler(ABC):
         Attempts to run a task which previously might have crashed. Defaults
         to skipping tasks with state 200, or 102, unless Force is specified,
         then it should rerun regardless of previous state.
-        
+
         :param task_id: The id of a task
         :type task_id: int
         :param force: Force task to rerun regardless of previous state
@@ -246,7 +247,7 @@ class base_handler(ABC):
         return
 
     @abstractmethod
-    def updateTaskState(self, task_id, state, message):        
+    def updateTaskState(self, task_id, state, message):
         """Update the state, message, and last updated of a task.
 
         :param task_id: The id of a task
@@ -270,8 +271,8 @@ class base_handler(ABC):
 
     @abstractmethod
     def getUnfinished(self, only_runnable=False):
-        """Returns tasks which are not finished, i.e., 
-        tasks that dont have state `200` 
+        """Returns tasks which are not finished, i.e.,
+        tasks that dont have state `200`
 
         :param only_runnable: Return only tasks that can be `run()`
         :return: ids of found tasks
