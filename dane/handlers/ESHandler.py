@@ -20,6 +20,7 @@ import json
 import logging
 import hashlib
 import datetime
+from typing import List
 
 from dane import Document, Task, Result
 from dane.handlers.base_handler import BaseHandler
@@ -930,3 +931,134 @@ class ESHandler(BaseHandler):
             return ret
         else:
             return []
+
+    """
+    --------------------------- NEW FUNCTIONS -----------------------------
+    NOTE: creator is part of the hashed doc ID, so maybe adding a Document.batch_id is better...
+    """
+
+    def _generate_tasks_of_creator_query(
+        self, creator: str, offset: int, size: int, base_query=True
+    ) -> dict:
+        logger.debug("Entering function")
+        match_creator_query = {
+            "bool": {
+                "must": [
+                    {
+                        "query_string": {
+                            "default_field": "creator.id",
+                            "query": '"{}"'.format(creator),
+                        }
+                    }
+                ]
+            }
+        }
+        tasks_query = {
+            "bool": {
+                "must": [
+                    {
+                        "has_parent": {
+                            "parent_type": "document",
+                            "query": match_creator_query,
+                        }
+                    },
+                    {"exists": {"field": "task.key"}},
+                ]
+            }
+        }
+        if base_query:
+            query: dict = {}
+            query["_source"] = ["task", "created_at", "updated_at", "role"]
+            query["from"] = offset
+            query["size"] = size
+            query["query"] = tasks_query
+            return query
+        return tasks_query
+
+    # FIXME: in case the underlying tasks mentioned: "task already assigned", the results will
+    # NOT be found this way
+    def _generate_results_of_creator_query(self, creator: str, offset: int, size: int):
+        logger.debug("Entering function")
+        tasks_of_creator_query = self._generate_tasks_of_creator_query(
+            creator, offset, size, False
+        )
+        return {
+            "_source": ["result", "created_at", "updated_at", "role"],
+            "from": offset,
+            "size": size,
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "has_parent": {
+                                "parent_type": "task",
+                                "query": tasks_of_creator_query,
+                            }
+                        },
+                        {
+                            "exists": {"field": "result.payload"}
+                        },  # only results with a payload
+                    ]
+                }
+            },
+        }
+
+    def get_tasks_of_creator(
+        self, creator: str, all_tasks: List[Task], offset=0, size=200
+    ) -> List[Task]:
+        logger.info(f"Fetching tasks of creator: {creator} from DANE index")
+        query = self._generate_tasks_of_creator_query(creator, offset, size)
+        logger.debug(json.dumps(query, indent=4, sort_keys=True))
+        result = self.es.search(
+            index=self.INDEX,
+            body=query,
+            request_timeout=self.config.ELASTICSEARCH.TIMEOUT,
+        )
+        if len(result["hits"]["hits"]) <= 0:
+            logger.debug(f"Done fetching all tasks for creator {creator}")
+            return all_tasks
+        else:
+            for hit in result["hits"]["hits"]:
+                hit["_source"]["task"]["_id"] = hit["_id"]
+                task = Task.from_json(hit["_source"])
+                all_tasks.append(task)
+            return self.get_tasks_of_creator(creator, all_tasks, offset + size, size)
+
+    def get_results_of_creator(
+        self, creator: str, all_results: List[Result], offset=0, size=200
+    ) -> List[Result]:
+        logger.debug(f"Fetching results of creator: {creator} from DANE index")
+        query = self._generate_results_of_creator_query(creator, offset, size)
+        logger.debug(json.dumps(query, indent=4, sort_keys=True))
+        result = self.es.search(
+            index=self.INDEX,
+            body=query,
+            request_timeout=self.config.ELASTICSEARCH.TIMEOUT,
+        )
+        if len(result["hits"]["hits"]) <= 0:
+            logger.debug(f"Done fetching all results for creator {creator}")
+            return all_results
+        else:
+            for hit in result["hits"]["hits"]:
+                logger.debug("Got a result")
+                logger.debug(hit)
+                r = {"_id": hit["_id"]}
+                r = {**r, **hit["_source"]["result"]}
+                all_results.append(Result.from_json(json.dumps(r)))
+            return self.get_results_of_creator(
+                creator, all_results, offset + size, size
+            )
+
+    """
+    {
+        "generator": {
+            "id": "",
+            "type": "",
+            "name": "",
+            "homepage": ""
+        },
+        "payload" : {
+            "..." : "..."
+        }
+    }
+    """
