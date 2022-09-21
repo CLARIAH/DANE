@@ -711,7 +711,7 @@ class ESHandler(BaseHandler):
                 )
             )
 
-    def _run(self, task):
+    def _queue_task(self, task):
         document = self.documentFromTaskId(task._id)
 
         routing_key = "{}.{}".format(document.target["type"], task.key)
@@ -736,14 +736,14 @@ class ESHandler(BaseHandler):
         task = self.taskFromTaskId(task_id)
         if task.state == ProcState.CREATED.value:
             # Fresh of the press task, run it no questions asked
-            self._run(task)
+            self._queue_task(task)  # queue the task
         elif task.state in [
             ProcState.TASK_RESET.value,
             ProcState.UNFINISHED_DEPENDENCY.value,
             ProcState.ERROR_INVALID_INPUT.value,
             ProcState.ERROR_PROXY.value,
         ]:  # Task that might be worth automatically retrying
-            self._run(task)
+            self._queue_task(task)
         else:
             # Requires manual intervention
             # and task resubmission once issue has been resolved
@@ -762,17 +762,22 @@ class ESHandler(BaseHandler):
         ):
             # Unless its already been queued or completed, we can run this again
             # Or we can force it to run again
-            self._run(task)
+            self._queue_task(task)
 
+    # handles the communcation received from the workers
     def callback(self, task_id, response):
         try:
+            logger.info(f"Task {task_id} came back with a response")
             task_key = self.getTaskKey(task_id)
 
             state = int(response.pop("state"))
             message = response.pop("message")
+            logger.info(f"Task state: {state}; message: {message}")
 
+            # update the state of the task in ES
             self.updateTaskState(task_id, state, message)
 
+            # if the task has unfinished dependencies, create them here
             doc = None
             if state == ProcState.UNFINISHED_DEPENDENCY.value:
                 logger.debug("Dependencies for task {} ({})".format(task_id, task_key))
@@ -788,7 +793,7 @@ class ESHandler(BaseHandler):
                         else:
                             td = Task(dep, api=self)
                         td.assign(doc._id)
-                        self.run(td._id)
+                        self.run(td._id)  # run the task immediately
             elif state != ProcState.SUCCESS.value:
                 logger.warning(
                     "Task {} ({}) failed with msg: #{} {}".format(
@@ -800,22 +805,23 @@ class ESHandler(BaseHandler):
             else:
                 logger.debug("Callback for task {} ({})".format(task_id, task_key))
 
+            # fetch the document that assigned the task
             if doc is None:
                 doc = self.documentFromTaskId(task_id)
                 doc.set_api(self)
 
+            # see if any other tasks were assigned to this doc and trigger them
             assigned = doc.getAssignedTasks()
             for at in assigned:
-                # dont retrigger self
-                # dont run other tasks for same doc that are also waiting for a dependency
-                if at["_id"] != task_id and (
+                # don't run other tasks for same doc that are also waiting for a dependency
+                if at["_id"] != task_id and (  # dont retrigger same task
                     at["state"]
-                    in [
+                    in [  # NOTE: these states are worth a (re)try?
                         ProcState.CREATED.value,
                         ProcState.ERROR_INVALID_INPUT.value,
                         ProcState.ERROR_PROXY.value,
                     ]
-                    or (
+                    or (  # NOTE: also trigger tasks that have unfinished dependencies??
                         at["state"] == ProcState.UNFINISHED_DEPENDENCY.value
                         and state != ProcState.UNFINISHED_DEPENDENCY.value
                     )
