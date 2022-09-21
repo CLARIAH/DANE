@@ -24,6 +24,9 @@ import threading
 import functools
 import traceback
 import os.path
+import logging
+
+logger = logging.getLogger("DANE")  # TODO change to __name__ everywhere later on
 
 
 class base_worker(ABC):
@@ -199,14 +202,18 @@ class base_worker(ABC):
                                 done = False
             if not done:
                 # some dependency isnt done yet, wait for it
+                logger.info(f"Dependencies not met, putting {task.key} task on hold")
                 response = {
                     "state": ProcState.UNFINISHED_DEPENDENCY.value,
                     "message": "Unfinished dependencies",
                     "dependencies": dependencies,
                 }
 
-                self._ack_and_reply(json.dumps(response), ch, method, props)
-            else:
+                self._ack_and_reply(response, ch, method, props)
+            else:  # start the worker "callback" in a different thread
+                logger.info(
+                    f"Dependencies met, starting the work on the {task.key} task"
+                )
                 self.thread = threading.Thread(
                     target=self._run, args=(task, doc, ch, method, props)
                 )
@@ -219,7 +226,7 @@ class base_worker(ABC):
                 "message": "Invalid format, unable to proceed",
             }
 
-            self._ack_and_reply(json.dumps(response), ch, method, props)
+            self._ack_and_reply(response, ch, method, props)
         except Exception as e:
             traceback.print_exc()  # TODO add a flag to disable this
             response = {
@@ -227,38 +234,66 @@ class base_worker(ABC):
                 "message": "Unhandled error: " + str(e),
             }
 
-            self._ack_and_reply(json.dumps(response), ch, method, props)
+            self._ack_and_reply(response, ch, method, props)
 
+    # Triggers the worker's callback function
+    # TODO send back a PROCESSING state BEFORE running the callback (figure out how)
     def _run(self, task, doc, ch, method, props):
         try:
+            # first set the status to PROCESSING.
+            self._ack_with_status_msg(
+                {
+                    "state": ProcState.PROCESSING.value,
+                    "message": f"Started processing task {task._id}",
+                },
+                ch,
+                method,
+                props,
+            )
+
+            # now let the worker do it's own work
             response = self.callback(task, doc)
+
+            # after the work, report back the resulting state
+            self._ack_with_status_msg(response, ch, method, props)
         except RefuseJobException:
-            # worker doesnt want the job yet, nack it
-            nack = functools.partial(ch.basic_nack, delivery_tag=method.delivery_tag)
-            self.connection.add_callback_threadsafe(nack)
+            # worker doesnt want the task yet, nack it
+            self._nack_refuse_task(ch, method)
             return
         except Exception as e:
             traceback.print_exc()  # TODO add a flag to disable this
+            self._ack_with_status_msg(
+                {
+                    "state": ProcState.ERROR.value,
+                    "message": f"Unhandled worker error: {str(e)}",
+                },
+                ch,
+                method,
+                props,
+            )
 
-            response = {
-                "state": ProcState.ERROR.value,
-                "message": "Unhandled worker error: " + str(e),
-            }
+    def _nack_refuse_task(self, ch, method):
+        nack = functools.partial(ch.basic_nack, delivery_tag=method.delivery_tag)
+        self.connection.add_callback_threadsafe(nack)
 
-        if not isinstance(response, str):
-            response = json.dumps(response)
-
-        reply_cb = functools.partial(self._ack_and_reply, response, ch, method, props)
+    def _ack_with_status_msg(self, response: dict, ch, method, props):
+        reply_cb = functools.partial(
+            self._ack_and_reply,
+            response,
+            ch,
+            method,
+            props,
+        )
         self.connection.add_callback_threadsafe(reply_cb)
 
-    def _ack_and_reply(self, response, ch, method, props):
+    def _ack_and_reply(self, response: dict, ch, method, props):
         ch.basic_publish(
             exchange="",
             routing_key=props.reply_to,
             properties=pika.BasicProperties(
                 correlation_id=props.correlation_id, delivery_mode=2
             ),
-            body=str(response),
+            body=json.dumps(response),  # convert to string
         )
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
