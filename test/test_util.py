@@ -1,5 +1,6 @@
 from dane.handlers.base_handler import BaseHandler
 from dane.errors import APIRegistrationError
+from dane.state import ProcState
 import uuid
 
 
@@ -32,7 +33,7 @@ class DummyHandler(BaseHandler):
             task._id = idx
             # store document state as HTTP response codes
             self.task_register[idx] = (task, document_id)
-            task.state = 202
+            task.state = ProcState.CREATED.value
             task.msg = "Created"
         else:
             raise APIRegistrationError(
@@ -61,7 +62,7 @@ class DummyHandler(BaseHandler):
 
     def run(self, task_id):
         task, document_id = self.task_register[task_id]
-        self.updateTaskState(task._id, 200, "Success!")
+        self.updateTaskState(task._id, ProcState.SUCCESS.value, "Success!")
         print(
             "DummyEndpoint: Executed task {} for "
             "document: {}".format(task.key, document_id)
@@ -69,7 +70,7 @@ class DummyHandler(BaseHandler):
 
     def retry(self, task_id, force=False):
         task, document_id = self.task_register[task_id]
-        self.updateTaskState(task._id, 200, "Retried successfully!")
+        self.updateTaskState(task._id, ProcState.SUCCESS.value, "Retried successfully!")
         print(
             "DummyEndpoint: Retried task {} for "
             "document: {}".format(task.key, document_id)
@@ -91,7 +92,9 @@ class DummyHandler(BaseHandler):
         return
 
     def getUnfinished(self):
-        return [t._id for t, _ in self.task_register if t.state != 200]
+        return [
+            t._id for t, _ in self.task_register if t.state != ProcState.SUCCESS.value
+        ]
 
     def registerResult(self, result, task_id):
         return

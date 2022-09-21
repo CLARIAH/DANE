@@ -13,7 +13,7 @@
 # limitations under the License.
 ##############################################################################
 
-from dane import Task, Document
+from dane import Task, Document, ProcState
 from dane.utils import cwd_is_git, get_git_revision, get_git_remote
 from dane.errors import RefuseJobException, ResourceConnectionError
 from dane.handlers import ESHandler
@@ -188,7 +188,11 @@ class base_worker(ABC):
                         if done:
                             # task is assigned to the document, but is it done?
                             if any(
-                                [a["state"] != 200 for a in assigned if a["key"] == dep]
+                                [
+                                    a["state"] != ProcState.SUCCESS.value
+                                    for a in assigned
+                                    if a["key"] == dep
+                                ]
                             ):
                                 # a task of type dep is assigned that isnt done
                                 # wait for it
@@ -196,7 +200,7 @@ class base_worker(ABC):
             if not done:
                 # some dependency isnt done yet, wait for it
                 response = {
-                    "state": 412,
+                    "state": ProcState.UNFINISHED_DEPENDENCY.value,
                     "message": "Unfinished dependencies",
                     "dependencies": dependencies,
                 }
@@ -210,12 +214,18 @@ class base_worker(ABC):
                 self.thread.start()
 
         except TypeError:
-            response = {"state": 400, "message": "Invalid format, unable to proceed"}
+            response = {
+                "state": ProcState.BAD_REQUEST.value,
+                "message": "Invalid format, unable to proceed",
+            }
 
             self._ack_and_reply(json.dumps(response), ch, method, props)
         except Exception as e:
             traceback.print_exc()  # TODO add a flag to disable this
-            response = {"state": 500, "message": "Unhandled error: " + str(e)}
+            response = {
+                "state": ProcState.ERROR.value,
+                "message": "Unhandled error: " + str(e),
+            }
 
             self._ack_and_reply(json.dumps(response), ch, method, props)
 
@@ -230,7 +240,10 @@ class base_worker(ABC):
         except Exception as e:
             traceback.print_exc()  # TODO add a flag to disable this
 
-            response = {"state": 500, "message": "Unhandled worker error: " + str(e)}
+            response = {
+                "state": ProcState.ERROR.value,
+                "message": "Unhandled worker error: " + str(e),
+            }
 
         if not isinstance(response, str):
             response = json.dumps(response)

@@ -22,7 +22,7 @@ import hashlib
 import datetime
 from typing import List
 
-from dane import Document, Task, Result
+from dane import Document, Task, Result, ProcState
 from dane.handlers.base_handler import BaseHandler
 from dane.errors import (
     DocumentExistsError,
@@ -215,7 +215,7 @@ class ESHandler(BaseHandler):
             errors = {e["create"]["_id"]: e["create"] for e in errors}
             for document in documents:
                 if document._id in errors.keys():
-                    if errors[document._id]["status"] == 409:
+                    if errors[document._id]["status"] == ProcState.ALREADY_EXISTS.value:
                         failed.append(
                             {
                                 "document": document,
@@ -313,7 +313,7 @@ class ESHandler(BaseHandler):
 
         _id = hashlib.sha1((document_id + task.key).encode("utf-8")).hexdigest()
 
-        task.state = 201
+        task.state = ProcState.CREATED.value  # TODO update Task object to use ProcState
         task.msg = "Created"
 
         t = {"task": json.loads(task.to_json())}
@@ -386,7 +386,7 @@ class ESHandler(BaseHandler):
         document_ids = docs
         del docs
 
-        task.state = 201
+        task.state = ProcState.CREATED.value
         task.msg = "Created"
 
         actions = []
@@ -425,7 +425,7 @@ class ESHandler(BaseHandler):
         errors = {e["create"]["_id"]: e["create"] for e in errors}
         for task, document_id in zip(tasks, document_ids):
             if task._id in errors.keys():
-                if errors[task._id]["status"] == 409:
+                if errors[task._id]["status"] == ProcState.ALREADY_EXISTS.value:
                     failed.append(
                         {
                             "document_id": document_id,
@@ -722,23 +722,27 @@ class ESHandler(BaseHandler):
                     task._id, task.key, document._id
                 )
             )
-            self.updateTaskState(task._id, 102, "Queued")
+            self.updateTaskState(task._id, ProcState.QUEUED.value, "Queued")
         except Exception as e:
             raise e
 
         try:
             self.queue.publish(routing_key, task, document)
         except Exception as e:
-            self.updateTaskState(task._id, 500, str(e))
+            self.updateTaskState(task._id, ProcState.ERROR.value, str(e))
             raise e
 
     def run(self, task_id):
         task = self.taskFromTaskId(task_id)
-        if task.state == 201:
+        if task.state == ProcState.CREATED.value:
             # Fresh of the press task, run it no questions asked
             self._run(task)
-        elif task.state in [205, 412, 502, 503]:
-            # Task that might be worth automatically retrying
+        elif task.state in [
+            ProcState.TASK_RESET.value,
+            ProcState.UNFINISHED_DEPENDENCY.value,
+            ProcState.ERROR_INVALID_INPUT.value,
+            ProcState.ERROR_PROXY.value,
+        ]:  # Task that might be worth automatically retrying
             self._run(task)
         else:
             # Requires manual intervention
@@ -747,7 +751,15 @@ class ESHandler(BaseHandler):
 
     def retry(self, task_id, force=False):
         task = self.taskFromTaskId(task_id)
-        if task.state not in [102, 200] or force:
+        if (
+            task.state
+            not in [
+                ProcState.QUEUED.value,
+                ProcState.PROCESSING.value,
+                ProcState.SUCCESS.value,
+            ]
+            or force
+        ):
             # Unless its already been queued or completed, we can run this again
             # Or we can force it to run again
             self._run(task)
@@ -762,7 +774,7 @@ class ESHandler(BaseHandler):
             self.updateTaskState(task_id, state, message)
 
             doc = None
-            if state == 412:
+            if state == ProcState.UNFINISHED_DEPENDENCY.value:
                 logger.debug("Dependencies for task {} ({})".format(task_id, task_key))
                 dependencies = response.pop("dependencies")
                 if len(dependencies) > 0:
@@ -777,7 +789,7 @@ class ESHandler(BaseHandler):
                             td = Task(dep, api=self)
                         td.assign(doc._id)
                         self.run(td._id)
-            elif state != 200:
+            elif state != ProcState.SUCCESS.value:
                 logger.warning(
                     "Task {} ({}) failed with msg: #{} {}".format(
                         task_key, task_id, state, message
@@ -797,8 +809,16 @@ class ESHandler(BaseHandler):
                 # dont retrigger self
                 # dont run other tasks for same doc that are also waiting for a dependency
                 if at["_id"] != task_id and (
-                    at["state"] in [201, 502, 503]
-                    or (at["state"] == 412 and state != 412)
+                    at["state"]
+                    in [
+                        ProcState.CREATED.value,
+                        ProcState.ERROR_INVALID_INPUT.value,
+                        ProcState.ERROR_PROXY.value,
+                    ]
+                    or (
+                        at["state"] == ProcState.UNFINISHED_DEPENDENCY.value
+                        and state != ProcState.UNFINISHED_DEPENDENCY.value
+                    )
                 ):
                     self.run(at["_id"])
 
@@ -807,7 +827,9 @@ class ESHandler(BaseHandler):
         except Exception:
             logger.exception("Unhandled error during callback")
 
-    def updateTaskState(self, task_id, state, message):
+    def updateTaskState(
+        self, task_id, state, message
+    ):  # TODO update using ProcState object
 
         self.es.update(
             index=self.INDEX,
@@ -825,7 +847,7 @@ class ESHandler(BaseHandler):
 
     def search(self, target_id, creator_id, page=1):
         page = int(max(1, page) - 1)
-        perpage = 100
+        perpage = 100  # TODO put in config
 
         query = {
             "_source": {"excludes": ["role"]},
@@ -866,10 +888,12 @@ class ESHandler(BaseHandler):
                         }
                     ],
                     "must_not": [
-                        {"match": {"task.state": 200}},  # already done!
+                        {
+                            "match": {"task.state": ProcState.SUCCESS.value}
+                        },  # already done!
                         {
                             "match": {
-                                "task.state": 412  # will be triggered once dependency finished
+                                "task.state": ProcState.UNFINISHED_DEPENDENCY.value  # will be triggered once dependency finished
                             }
                         },
                     ],
@@ -879,17 +903,20 @@ class ESHandler(BaseHandler):
 
         if only_runnable:  # TODO use state whitelist instead of blacklist?
             query["query"]["bool"]["must_not"].extend(
-                [
-                    {"match": {"task.state": 422}},  # requires manual intervention
-                    {"match": {"task.state": 500}},  # requires manual intervention
-                    {"match": {"task.state": 400}},  # requires manual intervention
-                    {"match": {"task.state": 403}},  # requires manual intervention
-                    {"match": {"task.state": 404}},  # requires manual intervention
-                    {"match": {"task.state": 102}},  # are queued
+                [  # the first 5 states require manual intervention
+                    {"match": {"task.state": ProcState.NO_ROUTE_TO_QUEUE.value}},
+                    {"match": {"task.state": ProcState.ERROR.value}},
+                    {"match": {"task.state": ProcState.BAD_REQUEST.value}},
+                    {"match": {"task.state": ProcState.ACCESS_DENIED.value}},
+                    {"match": {"task.state": ProcState.NOT_FOUND.value}},
+                    {"match": {"task.state": ProcState.QUEUED.value}},
+                    {"match": {"task.state": ProcState.PROCESSING.value}},
                 ]
             )
 
-        result = self.es.search(index=self.INDEX, body=query, size=1000)
+        result = self.es.search(
+            index=self.INDEX, body=query, size=1000
+        )  # TODO put size in conf?
 
         if result["hits"]["total"]["value"] > 0:
             ret = []
@@ -940,7 +967,7 @@ class ESHandler(BaseHandler):
     def _generate_tasks_of_creator_query(
         self, creator: str, offset: int, size: int, base_query=True
     ) -> dict:
-        logger.debug("Entering function")
+        logger.debug("Generating query to obtain Tasks of creator/batch")
         match_creator_query = {
             "bool": {
                 "must": [
@@ -978,7 +1005,7 @@ class ESHandler(BaseHandler):
     # FIXME: in case the underlying tasks mentioned: "task already assigned", the results will
     # NOT be found this way
     def _generate_results_of_creator_query(self, creator: str, offset: int, size: int):
-        logger.debug("Entering function")
+        logger.debug("Generating query to obtain Results of creator/batch")
         tasks_of_creator_query = self._generate_tasks_of_creator_query(
             creator, offset, size, False
         )
@@ -1048,17 +1075,3 @@ class ESHandler(BaseHandler):
             return self.get_results_of_creator(
                 creator, all_results, offset + size, size
             )
-
-    """
-    {
-        "generator": {
-            "id": "",
-            "type": "",
-            "name": "",
-            "homepage": ""
-        },
-        "payload" : {
-            "..." : "..."
-        }
-    }
-    """

@@ -14,6 +14,7 @@
 ##############################################################################
 
 from abc import ABC, abstractmethod
+from dane import ProcState
 
 
 class BaseHandler(ABC):
@@ -201,15 +202,15 @@ class BaseHandler(ABC):
         :return: Task doneness
         :rtype: bool
         """
-        return self.getTaskState(task_id) == 200
+        return self.getTaskState(task_id) == ProcState.SUCCESS.value
 
     @abstractmethod
     def run(self, task_id):
-        """Run the task with this id, and change its task state to `102`.
+        """Run the task with this id, and change its task state to `ProcState.QUEUED`.
 
         Running a task involves submitting it to a queue, so results might
-        only be available much later. Expects a task to have state `201`,
-        and it may retry tasks with state `502` or `503`.
+        only be available much later. Expects a task to have state `ProcState.CREATED`,
+        and it may retry tasks with state `ProcState.ERROR_INVALID_INPUT` or `ProcState.ERROR_PROXY`.
 
         :param task_id: The id of a task
         :type task_id: int
@@ -221,7 +222,7 @@ class BaseHandler(ABC):
         """Retry the task with this id.
 
         Attempts to run a task which previously might have crashed. Defaults
-        to skipping tasks with state 200, or 102, unless Force is specified,
+        to skipping tasks with state ProcState.SUCCESS, or ProcState.QUEUED, unless Force is specified,
         then it should rerun regardless of previous state.
 
         :param task_id: The id of a task
@@ -272,7 +273,7 @@ class BaseHandler(ABC):
     @abstractmethod
     def getUnfinished(self, only_runnable=False):
         """Returns tasks which are not finished, i.e.,
-        tasks that dont have state `200`
+        tasks that dont have state `ProcState.SUCCESS`
 
         :param only_runnable: Return only tasks that can be `run()`
         :return: ids of found tasks
