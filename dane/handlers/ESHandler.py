@@ -971,9 +971,9 @@ class ESHandler(BaseHandler):
     """
 
     def _generate_tasks_of_creator_query(
-        self, creator: str, offset: int, size: int, base_query=True
+        self, creator: str, task_key: str, offset: int, size: int, base_query=True
     ) -> dict:
-        logger.debug("Generating query to obtain Tasks of creator/batch")
+        logger.debug(f"Generating query to obtain {task_key} Tasks of creator/batch")
         match_creator_query = {
             "bool": {
                 "must": [
@@ -995,7 +995,12 @@ class ESHandler(BaseHandler):
                             "query": match_creator_query,
                         }
                     },
-                    {"exists": {"field": "task.key"}},
+                    {
+                        "query_string": {
+                            "default_field": "task.key",
+                            "query": task_key,
+                        }
+                    },
                 ]
             }
         }
@@ -1010,10 +1015,12 @@ class ESHandler(BaseHandler):
 
     # FIXME: in case the underlying tasks mentioned: "task already assigned", the results will
     # NOT be found this way
-    def _generate_results_of_creator_query(self, creator: str, offset: int, size: int):
+    def _generate_results_of_creator_query(
+        self, creator: str, task_key: str, offset: int, size: int
+    ):
         logger.debug("Generating query to obtain Results of creator/batch")
         tasks_of_creator_query = self._generate_tasks_of_creator_query(
-            creator, offset, size, False
+            creator, task_key, offset, size, False
         )
         return {
             "_source": ["result", "created_at", "updated_at", "role"],
@@ -1037,10 +1044,10 @@ class ESHandler(BaseHandler):
         }
 
     def get_tasks_of_creator(
-        self, creator: str, all_tasks: List[Task], offset=0, size=200
+        self, creator: str, task_key: str, all_tasks: List[Task], offset=0, size=200
     ) -> List[Task]:
-        logger.info(f"Fetching tasks of creator: {creator} from DANE index")
-        query = self._generate_tasks_of_creator_query(creator, offset, size)
+        logger.info(f"Fetching {task_key} tasks of creator: {creator} from DANE index")
+        query = self._generate_tasks_of_creator_query(creator, task_key, offset, size)
         logger.debug(json.dumps(query, indent=4, sort_keys=True))
         result = self.es.search(
             index=self.INDEX,
@@ -1055,13 +1062,15 @@ class ESHandler(BaseHandler):
                 hit["_source"]["task"]["_id"] = hit["_id"]
                 task = Task.from_json(hit["_source"])
                 all_tasks.append(task)
-            return self.get_tasks_of_creator(creator, all_tasks, offset + size, size)
+            return self.get_tasks_of_creator(creator, task_key, all_tasks, offset + size, size)
 
     def get_results_of_creator(
-        self, creator: str, all_results: List[Result], offset=0, size=200
+        self, creator: str, task_key: str, all_results: List[Result], offset=0, size=200
     ) -> List[Result]:
-        logger.debug(f"Fetching results of creator: {creator} from DANE index")
-        query = self._generate_results_of_creator_query(creator, offset, size)
+        logger.debug(
+            f"Fetching {task_key} results of creator: {creator} from DANE index"
+        )
+        query = self._generate_results_of_creator_query(creator, task_key, offset, size)
         logger.debug(json.dumps(query, indent=4, sort_keys=True))
         result = self.es.search(
             index=self.INDEX,
@@ -1079,5 +1088,22 @@ class ESHandler(BaseHandler):
                 r = {**r, **hit["_source"]["result"]}
                 all_results.append(Result.from_json(json.dumps(r)))
             return self.get_results_of_creator(
-                creator, all_results, offset + size, size
+                creator, task_key, all_results, offset + size, size
             )
+
+    # TODO finish this and wire it up in the api.py in DANE-server
+    def get_result_of_task(self, task_id: int) -> Result:
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {
+                            "parent_id": {
+                                "type": "result",
+                                "id": "a57c0e1c9c1be1e17bfdc3d75f0060f9fc217a3c",
+                            }
+                        }
+                    ]
+                }
+            }
+        }

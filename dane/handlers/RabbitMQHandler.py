@@ -87,7 +87,7 @@ class RabbitMQHandler:
         raise NotImplementedError("Stop should be implemented server-side")
 
     def assign_callback(self, callback):
-        raise NotImplementedError("assign_callback should be implemented server-side")
+        self.callback = callback
 
     def publish(self, routing_key, task, document, retry=False):
         try:
