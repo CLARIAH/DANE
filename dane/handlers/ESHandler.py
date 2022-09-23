@@ -20,7 +20,7 @@ import json
 import logging
 import hashlib
 import datetime
-from typing import List
+from typing import List, Optional
 
 from dane import Document, Task, Result, ProcState
 from dane.handlers.base_handler import BaseHandler
@@ -1062,7 +1062,9 @@ class ESHandler(BaseHandler):
                 hit["_source"]["task"]["_id"] = hit["_id"]
                 task = Task.from_json(hit["_source"])
                 all_tasks.append(task)
-            return self.get_tasks_of_creator(creator, task_key, all_tasks, offset + size, size)
+            return self.get_tasks_of_creator(
+                creator, task_key, all_tasks, offset + size, size
+            )
 
     def get_results_of_creator(
         self, creator: str, task_key: str, all_results: List[Result], offset=0, size=200
@@ -1092,7 +1094,7 @@ class ESHandler(BaseHandler):
             )
 
     # TODO finish this and wire it up in the api.py in DANE-server
-    def get_result_of_task(self, task_id: int) -> Result:
+    def get_result_of_task(self, task_id: int) -> Optional[Result]:
         query = {
             "query": {
                 "bool": {
@@ -1107,3 +1109,4 @@ class ESHandler(BaseHandler):
                 }
             }
         }
+        return None

@@ -20,6 +20,7 @@ from dane.handlers import ESHandler
 from abc import ABC, abstractmethod
 import pika
 import json
+from typing import Tuple, Optional
 import threading
 import functools
 import traceback
@@ -133,6 +134,27 @@ class base_worker(ABC):
         self.channel.basic_qos(prefetch_count=1)
         self._connected = True
         self._is_interrupted = False
+        # self._is_processing = False
+
+    """
+    def wait_for_new_task(self):
+        m, p, b = None
+        for method, props, body in self.channel.consume(
+                self.queue, inactivity_timeout=1
+            ):
+                if self._is_interrupted or not self._connected:
+                    break
+                if not method:
+                    continue
+                # if not self._is_processing:  # TODO: will the job get lost
+
+                # first inspect if the task has dependencies, otherwise start processing
+                m = method
+                p = props
+                b = body
+                break
+        self._inspect_task(self.channel, m, p, b)
+    """
 
     def run(self):
         """Start listening for tasks to be executed."""
@@ -144,7 +166,9 @@ class base_worker(ABC):
                     break
                 if not method:
                     continue
-                self._callback(self.channel, method, props, body)
+
+                # first inspect if the task has dependencies, otherwise start processing
+                self._inspect_task(self.channel, method, props, body)
         else:
             raise ResourceConnectionError("Not connected to AMQ")
 
@@ -155,10 +179,50 @@ class base_worker(ABC):
         else:
             raise ResourceConnectionError("Not connected to AMQ")
 
-    def _callback(self, ch, method, props, body):
+    def _validate_received_data(self, data: str) -> Optional[dict]:
+        logger.debug("Validating received queue data")
         try:
-            body = json.loads(body)
-            if "task" not in body.keys() or "document" not in body.keys():
+            valid_data = json.loads(data)
+            if all(x in valid_data.keys() for x in ["task", "document"]):
+                return valid_data
+        except json.JSONDecodeError:
+            logger.error(f"Non-JSON data passed in the queue: {data}")
+        return None
+
+    def _check_handler_or_die(self):
+        if self.handler is None:
+            raise SystemError("No handler available to check worker dependencies")
+
+    def _check_task_dependencies(self, doc: Document) -> Tuple[bool, list]:
+        done = True  # assume assigned are done, unless find otherwise
+        dependencies = []
+        if len(self.depends_on) > 0:
+            assigned_tasks = doc.getAssignedTasks()
+            task_keys = [t["key"] for t in assigned_tasks]
+
+            for dep in self.depends_on:
+                # if the task is not yet assigned to the document, create and assign it
+                if dep not in task_keys:
+                    dependencies.append(dep)
+                    done = False
+                elif done:  # otherwise only check if all preceding deps are done
+                    if any(  # task is assigned to the document, but is it done?
+                        [
+                            t["state"] != ProcState.SUCCESS.value
+                            for t in assigned_tasks
+                            if t["key"] == dep
+                        ]
+                    ):  # a task of type dep is assigned that isnt done, wait for it
+                        done = False
+        return done, dependencies
+
+    # inspects the received queue data and if there are any task dependencies
+    # that need to be done before this worker can properly do it's processing
+    def _inspect_task(self, ch, method, props, body):
+        try:
+            # first validate the received queue data
+            body = self._validate_received_data(body)
+            if not body:
                 raise KeyError(
                     (
                         "Incompleted task specification, "
@@ -166,56 +230,31 @@ class base_worker(ABC):
                     )
                 )
 
+            # check if the handler is available (raises SystemError)
+            self._check_handler_or_die()
+
+            # now create Task and Document objects from the queue data
             task = Task(**body["task"])
             doc = Document(**body["document"], api=self.handler)
 
-            done = True  # assume assigned are done, unless find otherwise
-            if len(self.depends_on) > 0:
-                if self.handler is None:
-                    raise SystemError(
-                        "No handler available to check worker dependencies"
-                    )
+            # try to find task dependencies before continuing
+            done, dependencies = self._check_task_dependencies(doc)
 
-                assigned = doc.getAssignedTasks()
-                assigned_keys = [a["key"] for a in assigned]
-
-                dependencies = []
-                for dep in self.depends_on:
-                    if dep not in assigned_keys:
-                        # this task is not yet assigned to the document
-                        # create and assign it
-                        dependencies.append(dep)
-                        done = False
-                    else:
-                        # only need to check if this is done if all preceding deps are done
-                        if done:
-                            # task is assigned to the document, but is it done?
-                            if any(
-                                [
-                                    a["state"] != ProcState.SUCCESS.value
-                                    for a in assigned
-                                    if a["key"] == dep
-                                ]
-                            ):
-                                # a task of type dep is assigned that isnt done
-                                # wait for it
-                                done = False
-            if not done:
-                # some dependency isnt done yet, wait for it
+            if not done:  # some dependency isn't done yet, wait for it
                 logger.info(f"Dependencies not met, putting {task.key} task on hold")
                 response = {
                     "state": ProcState.UNFINISHED_DEPENDENCY.value,
                     "message": "Unfinished dependencies",
                     "dependencies": dependencies,
                 }
-
                 self._ack_and_reply(response, ch, method, props)
             else:  # start the worker "callback" in a different thread
                 logger.info(
                     f"Dependencies met, starting the work on the {task.key} task"
                 )
                 self.thread = threading.Thread(
-                    target=self._run, args=(task, doc, ch, method, props)
+                    target=self._start_processing_task,
+                    args=(task, doc, ch, method, props),
                 )
                 self.thread.setDaemon(True)
                 self.thread.start()
@@ -225,7 +264,6 @@ class base_worker(ABC):
                 "state": ProcState.BAD_REQUEST.value,
                 "message": "Invalid format, unable to proceed",
             }
-
             self._ack_and_reply(response, ch, method, props)
         except Exception as e:
             traceback.print_exc()  # TODO add a flag to disable this
@@ -233,14 +271,14 @@ class base_worker(ABC):
                 "state": ProcState.ERROR.value,
                 "message": "Unhandled error: " + str(e),
             }
-
             self._ack_and_reply(response, ch, method, props)
 
     # Triggers the worker's callback function
     # TODO send back a PROCESSING state BEFORE running the callback (figure out how)
-    def _run(self, task, doc, ch, method, props):
+    def _start_processing_task(self, task, doc, ch, method, props):
         try:
-            # first set the status to PROCESSING.
+            # TODO: first set the status to PROCESSING.
+            """
             self._ack_with_status_msg(
                 {
                     "state": ProcState.PROCESSING.value,
@@ -250,6 +288,7 @@ class base_worker(ABC):
                 method,
                 props,
             )
+            """
 
             # now let the worker do it's own work
             response = self.callback(task, doc)
