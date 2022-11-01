@@ -24,6 +24,7 @@ from typing import List, Optional
 
 from dane import Document, Task, Result, ProcState
 from dane.handlers.base_handler import BaseHandler
+from dane.es_queries import tasks_of_creator_query, results_of_creator_query
 from dane.errors import (
     DocumentExistsError,
     UnregisteredError,
@@ -970,84 +971,11 @@ class ESHandler(BaseHandler):
     NOTE: creator is part of the hashed doc ID, so maybe adding a Document.batch_id is better...
     """
 
-    def _generate_tasks_of_creator_query(
-        self, creator: str, task_key: str, offset: int, size: int, base_query=True
-    ) -> dict:
-        logger.debug(f"Generating query to obtain {task_key} Tasks of creator/batch")
-        match_creator_query = {
-            "bool": {
-                "must": [
-                    {
-                        "query_string": {
-                            "default_field": "creator.id",
-                            "query": '"{}"'.format(creator),
-                        }
-                    }
-                ]
-            }
-        }
-        tasks_query = {
-            "bool": {
-                "must": [
-                    {
-                        "has_parent": {
-                            "parent_type": "document",
-                            "query": match_creator_query,
-                        }
-                    },
-                    {
-                        "query_string": {
-                            "default_field": "task.key",
-                            "query": task_key,
-                        }
-                    },
-                ]
-            }
-        }
-        if base_query:
-            query: dict = {}
-            query["_source"] = ["task", "created_at", "updated_at", "role"]
-            query["from"] = offset
-            query["size"] = size
-            query["query"] = tasks_query
-            return query
-        return tasks_query
-
-    # FIXME: in case the underlying tasks mentioned: "task already assigned", the results will
-    # NOT be found this way
-    def _generate_results_of_creator_query(
-        self, creator: str, task_key: str, offset: int, size: int
-    ):
-        logger.debug("Generating query to obtain Results of creator/batch")
-        tasks_of_creator_query = self._generate_tasks_of_creator_query(
-            creator, task_key, offset, size, False
-        )
-        return {
-            "_source": ["result", "created_at", "updated_at", "role"],
-            "from": offset,
-            "size": size,
-            "query": {
-                "bool": {
-                    "must": [
-                        {
-                            "has_parent": {
-                                "parent_type": "task",
-                                "query": tasks_of_creator_query,
-                            }
-                        },
-                        {
-                            "exists": {"field": "result.payload"}
-                        },  # only results with a payload
-                    ]
-                }
-            },
-        }
-
     def get_tasks_of_creator(
         self, creator: str, task_key: str, all_tasks: List[Task], offset=0, size=200
     ) -> List[Task]:
         logger.info(f"Fetching {task_key} tasks of creator: {creator} from DANE index")
-        query = self._generate_tasks_of_creator_query(creator, task_key, offset, size)
+        query = tasks_of_creator_query(creator, task_key, offset, size)
         logger.debug(json.dumps(query, indent=4, sort_keys=True))
         result = self.es.search(
             index=self.INDEX,
@@ -1072,7 +1000,7 @@ class ESHandler(BaseHandler):
         logger.debug(
             f"Fetching {task_key} results of creator: {creator} from DANE index"
         )
-        query = self._generate_results_of_creator_query(creator, task_key, offset, size)
+        query = results_of_creator_query(creator, task_key, offset, size)
         logger.debug(json.dumps(query, indent=4, sort_keys=True))
         result = self.es.search(
             index=self.INDEX,
