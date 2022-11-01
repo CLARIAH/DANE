@@ -739,7 +739,7 @@ class ESHandler(BaseHandler):
             self._queue_task(task)  # queue the task
         elif task.state in [
             ProcState.TASK_RESET.value,
-            ProcState.UNFINISHED_DEPENDENCY.value,
+            ProcState.UNFINISHED_DEPENDENCY.value,  # TODO how to deal with failed dependencies?
             ProcState.ERROR_INVALID_INPUT.value,
             ProcState.ERROR_PROXY.value,
         ]:  # Task that might be worth automatically retrying
@@ -764,7 +764,7 @@ class ESHandler(BaseHandler):
             # Or we can force it to run again
             self._queue_task(task)
 
-    # handles the communcation received from the workers
+    # handles the communication received from the workers
     def callback(self, task_id, response):
         try:
             logger.info(f"Task {task_id} came back with a response")
