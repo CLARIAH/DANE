@@ -24,7 +24,11 @@ from typing import List, Optional
 
 from dane import Document, Task, Result, ProcState
 from dane.handlers.base_handler import BaseHandler
-from dane.es_queries import tasks_of_creator_query, results_of_creator_query
+from dane.es_queries import (
+    result_of_task_query,
+    tasks_of_creator_query,
+    results_of_creator_query,
+)
 from dane.errors import (
     DocumentExistsError,
     UnregisteredError,
@@ -1022,19 +1026,8 @@ class ESHandler(BaseHandler):
             )
 
     # TODO finish this and wire it up in the api.py in DANE-server
-    def get_result_of_task(self, task_id: int) -> Optional[Result]:
-        query = {
-            "query": {
-                "bool": {
-                    "must": [
-                        {
-                            "parent_id": {
-                                "type": "result",
-                                "id": "a57c0e1c9c1be1e17bfdc3d75f0060f9fc217a3c",
-                            }
-                        }
-                    ]
-                }
-            }
-        }
+    def get_result_of_task(self, task_id: str) -> Optional[Result]:
+        query = result_of_task_query(task_id)
+        logger.warning("not implemented yet")
+        logger.debug(query)
         return None

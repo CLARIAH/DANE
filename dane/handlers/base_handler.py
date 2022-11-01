@@ -14,7 +14,8 @@
 ##############################################################################
 
 from abc import ABC, abstractmethod
-from dane import ProcState
+from dane import ProcState, Task, Result
+from typing import List, Optional
 
 
 class BaseHandler(ABC):
@@ -291,3 +292,19 @@ class BaseHandler(ABC):
         :type task_key: string, optional
         :return: list of dicts with task ids, keys, and states."""
         return
+
+    @abstractmethod
+    def get_tasks_of_creator(
+        self, creator: str, task_key: str, all_tasks: List[Task], offset=0, size=200
+    ) -> List[Task]:
+        raise NotImplementedError("Implement this for the creator endpoint")
+
+    @abstractmethod
+    def get_results_of_creator(
+        self, creator: str, task_key: str, all_results: List[Result], offset=0, size=200
+    ) -> List[Result]:
+        raise NotImplementedError("Implement this for the creator endpoint")
+
+    @abstractmethod
+    def get_result_of_task(self, task_id: str) -> Optional[Result]:
+        raise NotImplementedError("Implement this for the task endpoint")

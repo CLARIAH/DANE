@@ -1,6 +1,8 @@
 from dane.handlers.base_handler import BaseHandler
 from dane.errors import APIRegistrationError
 from dane.state import ProcState
+from dane import Result, Task
+from typing import List, Optional
 import uuid
 
 
@@ -110,3 +112,16 @@ class DummyHandler(BaseHandler):
 
     def getAssignedTasks(self, document_id, task_key=None):
         return
+
+    def get_tasks_of_creator(
+        self, creator: str, task_key: str, all_tasks: List[Task], offset=0, size=200
+    ) -> List[Task]:
+        return []
+
+    def get_results_of_creator(
+        self, creator: str, task_key: str, all_results: List[Result], offset=0, size=200
+    ) -> List[Result]:
+        return []
+
+    def get_result_of_task(self, task_id: str) -> Optional[Result]:
+        return None

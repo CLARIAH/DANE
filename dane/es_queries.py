@@ -5,6 +5,7 @@ logger = logging.getLogger(__name__)
 
 
 # query for fetching the result of a certain task
+# TODO test with "a57c0e1c9c1be1e17bfdc3d75f0060f9fc217a3c"
 def result_of_task_query(task_id: str):
     logger.debug("Generating result_of_task_query")
     return {"query": {"parent_id": {"type": "result", "id": task_id}}}
