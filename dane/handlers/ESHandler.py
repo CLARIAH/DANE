@@ -755,7 +755,7 @@ class ESHandler(BaseHandler):
             task.state
             not in [
                 ProcState.QUEUED.value,
-                ProcState.PROCESSING.value,
+                # ProcState.PROCESSING.value, NOTE: not used yet
                 ProcState.SUCCESS.value,
             ]
             or force
@@ -916,7 +916,7 @@ class ESHandler(BaseHandler):
                     {"match": {"task.state": ProcState.ACCESS_DENIED.value}},
                     {"match": {"task.state": ProcState.NOT_FOUND.value}},
                     {"match": {"task.state": ProcState.QUEUED.value}},
-                    {"match": {"task.state": ProcState.PROCESSING.value}},
+                    # {"match": {"task.state": ProcState.PROCESSING.value}}, NOTE: not active yet
                 ]
             )
 

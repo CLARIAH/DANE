@@ -7,10 +7,12 @@ from enum import IntEnum, unique
 
 @unique
 class ProcState(IntEnum):
-    PROCESSING = 102  # Task is currently being processed by a worker
+    # PROCESSING = 102  # Task is currently being processed by a worker
     SUCCESS = 200  # Task completed successfully.
     CREATED = 201  # Task is registered, but has not been acted upon.
-    QUEUED = 202  # Task has been accepted and is waiting in the queue
+    QUEUED = (
+        102  # Change to: 202 later. Task has been accepted and is waiting in the queue
+    )
     TASK_RESET = 205  # Task reset state, typically after manual intervention
     BAD_REQUEST = 400  # Malformed request, typically the document or task description.
     ACCESS_DENIED = 403  # Access denied to underlying source material.
