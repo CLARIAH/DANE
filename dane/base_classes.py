@@ -23,7 +23,6 @@ import json
 from typing import Tuple, Optional
 import threading
 import functools
-import traceback
 import os.path
 import logging
 
@@ -136,7 +135,7 @@ class base_worker(ABC):
         self._is_interrupted = False
         # self._is_processing = False
 
-    """
+    """ TODO call this from run() later on
     def wait_for_new_task(self):
         m, p, b = None
         for method, props, body in self.channel.consume(
@@ -266,7 +265,7 @@ class base_worker(ABC):
             }
             self._ack_and_reply(response, ch, method, props)
         except Exception as e:
-            traceback.print_exc()  # TODO add a flag to disable this
+            logger.exception("Unhandled error")
             response = {
                 "state": ProcState.ERROR.value,
                 "message": "Unhandled error: " + str(e),
@@ -300,7 +299,7 @@ class base_worker(ABC):
             self._nack_refuse_task(ch, method)
             return
         except Exception as e:
-            traceback.print_exc()  # TODO add a flag to disable this
+            logger.exception("Unhandler error")
             self._ack_with_status_msg(
                 {
                     "state": ProcState.ERROR.value,
