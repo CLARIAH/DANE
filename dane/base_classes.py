@@ -59,7 +59,7 @@ class base_worker(ABC):
     def __init__(
         self, queue, binding_key, config, depends_on=[], auto_connect=True, no_api=False
     ):
-
+        logger.info("Initialising base worker")
         self.queue = queue
 
         if not isinstance(binding_key, list):
@@ -68,6 +68,7 @@ class base_worker(ABC):
         for bk in binding_key:
             type_filter = bk.split(".")[0]
             if type_filter not in self.VALID_TYPES:
+                logger.error(f"Invalid type filter: {type_filter}")
                 raise ValueError(
                     "Invalid type filter `{}`. Valid types are: {}".format(
                         type_filter, ", ".join(self.VALID_TYPES)
@@ -101,6 +102,7 @@ class base_worker(ABC):
 
     def connect(self):
         """Connect the worker to the AMQ. Called by init if autoconnecting."""
+        logger.info("Connecting to message queue...")
         self.host = self.config.RABBITMQ.HOST
         self.port = self.config.RABBITMQ.PORT
         self.exchange = self.config.RABBITMQ.EXCHANGE
@@ -152,11 +154,12 @@ class base_worker(ABC):
                 p = props
                 b = body
                 break
-        self._inspect_task(self.channel, m, p, b)
+        self._inspect_then_run_task(self.channel, m, p, b)
     """
 
     def run(self):
         """Start listening for tasks to be executed."""
+        logger.info("Waiting for the queue to bring in some tasks...")
         if self._connected:
             for method, props, body in self.channel.consume(
                 self.queue, inactivity_timeout=1
@@ -167,19 +170,20 @@ class base_worker(ABC):
                     continue
 
                 # first inspect if the task has dependencies, otherwise start processing
-                self._inspect_task(self.channel, method, props, body)
+                self._inspect_then_run_task(self.channel, method, props, body)
         else:
             raise ResourceConnectionError("Not connected to AMQ")
 
     def stop(self):
         """Stop listening for tasks to be executed."""
+        logger.info("No longer waiting for the queue, stopping...")
         if self._connected:
             self._is_interrupted = True
         else:
             raise ResourceConnectionError("Not connected to AMQ")
 
     def _validate_received_data(self, data: str) -> Optional[dict]:
-        logger.debug("Validating received queue data")
+        logger.info("Validating received queue data")
         try:
             valid_data = json.loads(data)
             if all(x in valid_data.keys() for x in ["task", "document"]):
@@ -189,10 +193,14 @@ class base_worker(ABC):
         return None
 
     def _check_handler_or_die(self):
+        logger.info("Checking handler availability")
         if self.handler is None:
             raise SystemError("No handler available to check worker dependencies")
 
     def _check_task_dependencies(self, doc: Document) -> Tuple[bool, list]:
+        logger.info(
+            "Checking tasks dependencies (if they are met or we still have to wait)"
+        )
         done = True  # assume assigned are done, unless find otherwise
         dependencies = []
         if len(self.depends_on) > 0:
@@ -217,7 +225,8 @@ class base_worker(ABC):
 
     # inspects the received queue data and if there are any task dependencies
     # that need to be done before this worker can properly do it's processing
-    def _inspect_task(self, ch, method, props, body):
+    def _inspect_then_run_task(self, ch, method, props, body):
+        logger.info("Inspecting task obtained from queue data")
         try:
             # first validate the received queue data
             body = self._validate_received_data(body)
@@ -237,9 +246,9 @@ class base_worker(ABC):
             doc = Document(**body["document"], api=self.handler)
 
             # try to find task dependencies before continuing
-            done, dependencies = self._check_task_dependencies(doc)
+            dependencies_met, dependencies = self._check_task_dependencies(doc)
 
-            if not done:  # some dependency isn't done yet, wait for it
+            if not dependencies_met:  # some dependency isn't done yet, wait for it
                 logger.info(f"Dependencies not met, putting {task.key} task on hold")
                 response = {
                     "state": ProcState.UNFINISHED_DEPENDENCY.value,
@@ -259,6 +268,7 @@ class base_worker(ABC):
                 self.thread.start()
 
         except TypeError:
+            logger.exception("Invalid format, unable to proceed")
             response = {
                 "state": ProcState.BAD_REQUEST.value,
                 "message": "Invalid format, unable to proceed",
@@ -275,6 +285,7 @@ class base_worker(ABC):
     # Triggers the worker's callback function
     # TODO send back a PROCESSING state BEFORE running the callback (figure out how)
     def _start_processing_task(self, task, doc, ch, method, props):
+        logger.info(f"Started processing task {task._id} for doc {doc._id}")
         try:
             # TODO: first set the status to PROCESSING.
             """
@@ -295,6 +306,7 @@ class base_worker(ABC):
             # after the work, report back the resulting state
             self._ack_with_status_msg(response, ch, method, props)
         except RefuseJobException:
+            logger.exception("Job refused")
             # worker doesnt want the task yet, nack it
             self._nack_refuse_task(ch, method)
             return
@@ -311,10 +323,12 @@ class base_worker(ABC):
             )
 
     def _nack_refuse_task(self, ch, method):
+        logger.info("Send NACK to queue: refuse task")
         nack = functools.partial(ch.basic_nack, delivery_tag=method.delivery_tag)
         self.connection.add_callback_threadsafe(nack)
 
     def _ack_with_status_msg(self, response: dict, ch, method, props):
+        logger.info("Send ACK + msg back to queue (async)")
         reply_cb = functools.partial(
             self._ack_and_reply,
             response,
@@ -325,6 +339,7 @@ class base_worker(ABC):
         self.connection.add_callback_threadsafe(reply_cb)
 
     def _ack_and_reply(self, response: dict, ch, method, props):
+        logger.info("Send ACK + msg back to queue")
         ch.basic_publish(
             exchange="",
             routing_key=props.reply_to,
@@ -346,6 +361,7 @@ class base_worker(ABC):
         :return: Dict with keys `TEMP_FOLDER` and `OUT_FOLDER`
         :rtype: dict
         """
+        logger.info("Generating TEMP_FOLDER and OUT_FOLDER")
         # expect that TEMP and OUT folder exist
         TEMP_SOURCE = self.config.PATHS.TEMP_FOLDER
         OUT_SOURCE = self.config.PATHS.OUT_FOLDER
