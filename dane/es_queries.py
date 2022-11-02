@@ -61,11 +61,9 @@ def result_of_target_id_query(target_id: str, task_key: str):
     }
 
 
-# query for fetching all tasks for documents with a certain creator.id (used to record batches)
-def tasks_of_creator_query(
-    creator: str, task_key: str, offset: int, size: int, base_query=True
+def docs_of_creator_query(
+    creator: str, offset: int, size: int, base_query=True
 ) -> dict:
-    logger.debug("Generating tasks_of_creator_query")
     match_creator_query = {
         "bool": {
             "must": [
@@ -78,6 +76,22 @@ def tasks_of_creator_query(
             ]
         }
     }
+    if base_query:
+        query: dict = {}
+        query["_source"] = ["target", "creator", "created_at", "updated_at"]
+        query["from"] = offset
+        query["size"] = size
+        query["query"] = match_creator_query
+        return query
+    return match_creator_query
+
+
+# query for fetching all tasks for documents with a certain creator.id (used to record batches)
+def tasks_of_creator_query(
+    creator: str, task_key: str, offset: int, size: int, base_query=True
+) -> dict:
+    logger.debug("Generating tasks_of_creator_query")
+    match_creator_query = docs_of_creator_query(creator, offset, size, False)
     tasks_query = {
         "bool": {
             "must": [

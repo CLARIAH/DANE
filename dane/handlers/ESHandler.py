@@ -27,6 +27,7 @@ from dane.handlers.base_handler import BaseHandler
 from dane.es_queries import (
     result_of_task_query,
     tasks_of_creator_query,
+    docs_of_creator_query,
     results_of_creator_query,
 )
 from dane.errors import (
@@ -974,6 +975,27 @@ class ESHandler(BaseHandler):
     --------------------------- NEW FUNCTIONS -----------------------------
     NOTE: creator is part of the hashed doc ID, so maybe adding a Document.batch_id is better...
     """
+
+    def get_docs_of_creator(
+        self, creator: str, all_docs: List[Document], offset=0, size=200
+    ) -> List[Document]:
+        logger.info(f"Fetching all docs of creator: {creator} from DANE index")
+        query = docs_of_creator_query(creator, offset, size)
+        logger.debug(json.dumps(query, indent=4, sort_keys=True))
+        result = self.es.search(
+            index=self.INDEX,
+            body=query,
+            request_timeout=self.config.ELASTICSEARCH.TIMEOUT,
+        )
+        if len(result["hits"]["hits"]) <= 0:
+            logger.debug(f"Done fetching all docs for creator {creator}")
+            return all_docs
+        else:
+            for hit in result["hits"]["hits"]:
+                hit["_source"]["_id"] = hit["_id"]  # weird but ok
+                doc = Document.from_json(hit["_source"])
+                all_docs.append(doc)
+            return self.get_docs_of_creator(creator, all_docs, offset + size, size)
 
     def get_tasks_of_creator(
         self, creator: str, task_key: str, all_tasks: List[Task], offset=0, size=200

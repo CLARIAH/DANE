@@ -14,7 +14,7 @@
 ##############################################################################
 
 from abc import ABC, abstractmethod
-from dane import ProcState, Task, Result
+from dane import ProcState, Task, Result, Document
 from typing import List, Optional
 
 
@@ -292,6 +292,16 @@ class BaseHandler(ABC):
         :type task_key: string, optional
         :return: list of dicts with task ids, keys, and states."""
         return
+
+    """
+    --------------------------- NEW CREATOR-CENTRAL FUNCTIONS -----------------------------
+    """
+
+    @abstractmethod
+    def get_docs_of_creator(
+        self, creator: str, all_docs: List[Document], offset=0, size=200
+    ) -> List[Document]:
+        raise NotImplementedError("Implement this for the creator endpoint")
 
     @abstractmethod
     def get_tasks_of_creator(
