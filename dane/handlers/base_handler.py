@@ -14,6 +14,8 @@
 ##############################################################################
 
 from abc import ABC, abstractmethod
+from dane import ProcState, Task, Result, Document
+from typing import List, Optional
 
 
 class BaseHandler(ABC):
@@ -201,15 +203,15 @@ class BaseHandler(ABC):
         :return: Task doneness
         :rtype: bool
         """
-        return self.getTaskState(task_id) == 200
+        return self.getTaskState(task_id) == ProcState.SUCCESS.value
 
     @abstractmethod
     def run(self, task_id):
-        """Run the task with this id, and change its task state to `102`.
+        """Run the task with this id, and change its task state to `ProcState.QUEUED`.
 
         Running a task involves submitting it to a queue, so results might
-        only be available much later. Expects a task to have state `201`,
-        and it may retry tasks with state `502` or `503`.
+        only be available much later. Expects a task to have state `ProcState.CREATED`,
+        and it may retry tasks with state `ProcState.ERROR_INVALID_INPUT` or `ProcState.ERROR_PROXY`.
 
         :param task_id: The id of a task
         :type task_id: int
@@ -221,7 +223,7 @@ class BaseHandler(ABC):
         """Retry the task with this id.
 
         Attempts to run a task which previously might have crashed. Defaults
-        to skipping tasks with state 200, or 102, unless Force is specified,
+        to skipping tasks with state ProcState.SUCCESS, or ProcState.QUEUED, unless Force is specified,
         then it should rerun regardless of previous state.
 
         :param task_id: The id of a task
@@ -272,7 +274,7 @@ class BaseHandler(ABC):
     @abstractmethod
     def getUnfinished(self, only_runnable=False):
         """Returns tasks which are not finished, i.e.,
-        tasks that dont have state `200`
+        tasks that dont have state `ProcState.SUCCESS`
 
         :param only_runnable: Return only tasks that can be `run()`
         :return: ids of found tasks
@@ -290,3 +292,29 @@ class BaseHandler(ABC):
         :type task_key: string, optional
         :return: list of dicts with task ids, keys, and states."""
         return
+
+    """
+    --------------------------- NEW CREATOR-CENTRAL FUNCTIONS -----------------------------
+    """
+
+    @abstractmethod
+    def get_docs_of_creator(
+        self, creator: str, all_docs: List[Document], offset=0, size=200
+    ) -> List[Document]:
+        raise NotImplementedError("Implement this for the creator endpoint")
+
+    @abstractmethod
+    def get_tasks_of_creator(
+        self, creator: str, task_key: str, all_tasks: List[Task], offset=0, size=200
+    ) -> List[Task]:
+        raise NotImplementedError("Implement this for the creator endpoint")
+
+    @abstractmethod
+    def get_results_of_creator(
+        self, creator: str, task_key: str, all_results: List[Result], offset=0, size=200
+    ) -> List[Result]:
+        raise NotImplementedError("Implement this for the creator endpoint")
+
+    @abstractmethod
+    def get_result_of_task(self, task_id: str) -> Optional[Result]:
+        raise NotImplementedError("Implement this for the task endpoint")

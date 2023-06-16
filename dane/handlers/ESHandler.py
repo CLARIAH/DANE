@@ -20,9 +20,16 @@ import json
 import logging
 import hashlib
 import datetime
+from typing import List, Optional
 
-from dane import Document, Task, Result
+from dane import Document, Task, Result, ProcState
 from dane.handlers.base_handler import BaseHandler
+from dane.es_queries import (
+    result_of_task_query,
+    tasks_of_creator_query,
+    docs_of_creator_query,
+    results_of_creator_query,
+)
 from dane.errors import (
     DocumentExistsError,
     UnregisteredError,
@@ -214,7 +221,7 @@ class ESHandler(BaseHandler):
             errors = {e["create"]["_id"]: e["create"] for e in errors}
             for document in documents:
                 if document._id in errors.keys():
-                    if errors[document._id]["status"] == 409:
+                    if errors[document._id]["status"] == ProcState.ALREADY_EXISTS.value:
                         failed.append(
                             {
                                 "document": document,
@@ -312,7 +319,7 @@ class ESHandler(BaseHandler):
 
         _id = hashlib.sha1((document_id + task.key).encode("utf-8")).hexdigest()
 
-        task.state = 201
+        task.state = ProcState.CREATED.value  # TODO update Task object to use ProcState
         task.msg = "Created"
 
         t = {"task": json.loads(task.to_json())}
@@ -385,7 +392,7 @@ class ESHandler(BaseHandler):
         document_ids = docs
         del docs
 
-        task.state = 201
+        task.state = ProcState.CREATED.value
         task.msg = "Created"
 
         actions = []
@@ -424,7 +431,7 @@ class ESHandler(BaseHandler):
         errors = {e["create"]["_id"]: e["create"] for e in errors}
         for task, document_id in zip(tasks, document_ids):
             if task._id in errors.keys():
-                if errors[task._id]["status"] == 409:
+                if errors[task._id]["status"] == ProcState.ALREADY_EXISTS.value:
                     failed.append(
                         {
                             "document_id": document_id,
@@ -710,7 +717,7 @@ class ESHandler(BaseHandler):
                 )
             )
 
-    def _run(self, task):
+    def _queue_task(self, task):
         document = self.documentFromTaskId(task._id)
 
         routing_key = "{}.{}".format(document.target["type"], task.key)
@@ -721,24 +728,28 @@ class ESHandler(BaseHandler):
                     task._id, task.key, document._id
                 )
             )
-            self.updateTaskState(task._id, 102, "Queued")
+            self.updateTaskState(task._id, ProcState.QUEUED.value, "Queued")
         except Exception as e:
             raise e
 
         try:
             self.queue.publish(routing_key, task, document)
         except Exception as e:
-            self.updateTaskState(task._id, 500, str(e))
+            self.updateTaskState(task._id, ProcState.ERROR.value, str(e))
             raise e
 
     def run(self, task_id):
         task = self.taskFromTaskId(task_id)
-        if task.state == 201:
+        if task.state == ProcState.CREATED.value:
             # Fresh of the press task, run it no questions asked
-            self._run(task)
-        elif task.state in [205, 412, 502, 503]:
-            # Task that might be worth automatically retrying
-            self._run(task)
+            self._queue_task(task)  # queue the task
+        elif task.state in [
+            ProcState.TASK_RESET.value,
+            ProcState.UNFINISHED_DEPENDENCY.value,  # TODO how to deal with failed dependencies?
+            ProcState.ERROR_INVALID_INPUT.value,
+            ProcState.ERROR_PROXY.value,
+        ]:  # Task that might be worth automatically retrying
+            self._queue_task(task)
         else:
             # Requires manual intervention
             # and task resubmission once issue has been resolved
@@ -746,22 +757,34 @@ class ESHandler(BaseHandler):
 
     def retry(self, task_id, force=False):
         task = self.taskFromTaskId(task_id)
-        if task.state not in [102, 200] or force:
+        if (
+            task.state
+            not in [
+                ProcState.QUEUED.value,
+                ProcState.SUCCESS.value,
+            ]
+            or force
+        ):
             # Unless its already been queued or completed, we can run this again
             # Or we can force it to run again
-            self._run(task)
+            self._queue_task(task)
 
+    # handles the communication received from the workers
     def callback(self, task_id, response):
         try:
+            logger.info(f"Task {task_id} came back with a response")
             task_key = self.getTaskKey(task_id)
 
             state = int(response.pop("state"))
             message = response.pop("message")
+            logger.info(f"Task state: {state}; message: {message}")
 
+            # update the state of the task in ES
             self.updateTaskState(task_id, state, message)
 
+            # if the task has unfinished dependencies, create them here
             doc = None
-            if state == 412:
+            if state == ProcState.UNFINISHED_DEPENDENCY.value:
                 logger.debug("Dependencies for task {} ({})".format(task_id, task_key))
                 dependencies = response.pop("dependencies")
                 if len(dependencies) > 0:
@@ -775,8 +798,8 @@ class ESHandler(BaseHandler):
                         else:
                             td = Task(dep, api=self)
                         td.assign(doc._id)
-                        self.run(td._id)
-            elif state != 200:
+                        self.run(td._id)  # run the task immediately
+            elif state != ProcState.SUCCESS.value:
                 logger.warning(
                     "Task {} ({}) failed with msg: #{} {}".format(
                         task_key, task_id, state, message
@@ -787,17 +810,26 @@ class ESHandler(BaseHandler):
             else:
                 logger.debug("Callback for task {} ({})".format(task_id, task_key))
 
+            # fetch the document that assigned the task
             if doc is None:
                 doc = self.documentFromTaskId(task_id)
                 doc.set_api(self)
 
+            # see if any other tasks were assigned to this doc and trigger them
             assigned = doc.getAssignedTasks()
             for at in assigned:
-                # dont retrigger self
-                # dont run other tasks for same doc that are also waiting for a dependency
-                if at["_id"] != task_id and (
-                    at["state"] in [201, 502, 503]
-                    or (at["state"] == 412 and state != 412)
+                # don't run other tasks for same doc that are also waiting for a dependency
+                if at["_id"] != task_id and (  # dont retrigger same task
+                    at["state"]
+                    in [  # NOTE: these states are worth a (re)try?
+                        ProcState.CREATED.value,
+                        ProcState.ERROR_INVALID_INPUT.value,
+                        ProcState.ERROR_PROXY.value,
+                    ]
+                    or (  # NOTE: also trigger tasks that have unfinished dependencies??
+                        at["state"] == ProcState.UNFINISHED_DEPENDENCY.value
+                        and state != ProcState.UNFINISHED_DEPENDENCY.value
+                    )
                 ):
                     self.run(at["_id"])
 
@@ -806,7 +838,9 @@ class ESHandler(BaseHandler):
         except Exception:
             logger.exception("Unhandled error during callback")
 
-    def updateTaskState(self, task_id, state, message):
+    def updateTaskState(
+        self, task_id, state, message
+    ):  # TODO update using ProcState object
 
         self.es.update(
             index=self.INDEX,
@@ -824,7 +858,7 @@ class ESHandler(BaseHandler):
 
     def search(self, target_id, creator_id, page=1):
         page = int(max(1, page) - 1)
-        perpage = 100
+        perpage = 100  # TODO put in config
 
         query = {
             "_source": {"excludes": ["role"]},
@@ -865,10 +899,12 @@ class ESHandler(BaseHandler):
                         }
                     ],
                     "must_not": [
-                        {"match": {"task.state": 200}},  # already done!
+                        {
+                            "match": {"task.state": ProcState.SUCCESS.value}
+                        },  # already done!
                         {
                             "match": {
-                                "task.state": 412  # will be triggered once dependency finished
+                                "task.state": ProcState.UNFINISHED_DEPENDENCY.value  # will be triggered once dependency finished
                             }
                         },
                     ],
@@ -878,17 +914,20 @@ class ESHandler(BaseHandler):
 
         if only_runnable:  # TODO use state whitelist instead of blacklist?
             query["query"]["bool"]["must_not"].extend(
-                [
-                    {"match": {"task.state": 422}},  # requires manual intervention
-                    {"match": {"task.state": 500}},  # requires manual intervention
-                    {"match": {"task.state": 400}},  # requires manual intervention
-                    {"match": {"task.state": 403}},  # requires manual intervention
-                    {"match": {"task.state": 404}},  # requires manual intervention
-                    {"match": {"task.state": 102}},  # are queued
+                [  # the first 5 states require manual intervention
+                    {"match": {"task.state": ProcState.NO_ROUTE_TO_QUEUE.value}},
+                    {"match": {"task.state": ProcState.ERROR.value}},
+                    {"match": {"task.state": ProcState.BAD_REQUEST.value}},
+                    {"match": {"task.state": ProcState.ACCESS_DENIED.value}},
+                    {"match": {"task.state": ProcState.NOT_FOUND.value}},
+                    {"match": {"task.state": ProcState.QUEUED.value}},
+                    # {"match": {"task.state": ProcState.PROCESSING.value}}, NOTE: not active yet
                 ]
             )
 
-        result = self.es.search(index=self.INDEX, body=query, size=1000)
+        result = self.es.search(
+            index=self.INDEX, body=query, size=1000
+        )  # TODO put size in conf?
 
         if result["hits"]["total"]["value"] > 0:
             ret = []
@@ -930,3 +969,86 @@ class ESHandler(BaseHandler):
             return ret
         else:
             return []
+
+    """
+    --------------------------- NEW FUNCTIONS -----------------------------
+    NOTE: creator is part of the hashed doc ID, so maybe adding a Document.batch_id is better...
+    """
+
+    def get_docs_of_creator(
+        self, creator: str, all_docs: List[Document], offset=0, size=200
+    ) -> List[Document]:
+        logger.info(f"Fetching all docs of creator: {creator} from DANE index")
+        query = docs_of_creator_query(creator, offset, size)
+        logger.debug(json.dumps(query, indent=4, sort_keys=True))
+        result = self.es.search(
+            index=self.INDEX,
+            body=query,
+            request_timeout=self.config.ELASTICSEARCH.TIMEOUT,
+        )
+        if len(result["hits"]["hits"]) <= 0:
+            logger.debug(f"Done fetching all docs for creator {creator}")
+            return all_docs
+        else:
+            for hit in result["hits"]["hits"]:
+                hit["_source"]["_id"] = hit["_id"]  # weird but ok
+                doc = Document.from_json(hit["_source"])
+                all_docs.append(doc)
+            return self.get_docs_of_creator(creator, all_docs, offset + size, size)
+
+    def get_tasks_of_creator(
+        self, creator: str, task_key: str, all_tasks: List[Task], offset=0, size=200
+    ) -> List[Task]:
+        logger.info(f"Fetching {task_key} tasks of creator: {creator} from DANE index")
+        query = tasks_of_creator_query(creator, task_key, offset, size)
+        logger.debug(json.dumps(query, indent=4, sort_keys=True))
+        result = self.es.search(
+            index=self.INDEX,
+            body=query,
+            request_timeout=self.config.ELASTICSEARCH.TIMEOUT,
+        )
+        if len(result["hits"]["hits"]) <= 0:
+            logger.debug(f"Done fetching all tasks for creator {creator}")
+            return all_tasks
+        else:
+            for hit in result["hits"]["hits"]:
+                hit["_source"]["task"]["_id"] = hit["_id"]
+                task = Task.from_json(hit["_source"])
+                all_tasks.append(task)
+            return self.get_tasks_of_creator(
+                creator, task_key, all_tasks, offset + size, size
+            )
+
+    def get_results_of_creator(
+        self, creator: str, task_key: str, all_results: List[Result], offset=0, size=200
+    ) -> List[Result]:
+        logger.debug(
+            f"Fetching {task_key} results of creator: {creator} from DANE index"
+        )
+        query = results_of_creator_query(creator, task_key, offset, size)
+        logger.debug(json.dumps(query, indent=4, sort_keys=True))
+        result = self.es.search(
+            index=self.INDEX,
+            body=query,
+            request_timeout=self.config.ELASTICSEARCH.TIMEOUT,
+        )
+        if len(result["hits"]["hits"]) <= 0:
+            logger.debug(f"Done fetching all results for creator {creator}")
+            return all_results
+        else:
+            for hit in result["hits"]["hits"]:
+                logger.debug("Got a result")
+                logger.debug(hit)
+                r = {"_id": hit["_id"]}
+                r = {**r, **hit["_source"]["result"]}
+                all_results.append(Result.from_json(json.dumps(r)))
+            return self.get_results_of_creator(
+                creator, task_key, all_results, offset + size, size
+            )
+
+    # TODO finish this and wire it up in the api.py in DANE-server
+    def get_result_of_task(self, task_id: str) -> Optional[Result]:
+        query = result_of_task_query(task_id)
+        logger.warning("not implemented yet")
+        logger.debug(query)
+        return None

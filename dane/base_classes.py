@@ -13,17 +13,20 @@
 # limitations under the License.
 ##############################################################################
 
-from dane import Task, Document
+from dane import Task, Document, ProcState
 from dane.utils import cwd_is_git, get_git_revision, get_git_remote
 from dane.errors import RefuseJobException, ResourceConnectionError
 from dane.handlers import ESHandler
 from abc import ABC, abstractmethod
 import pika
 import json
+from typing import Tuple, Optional
 import threading
 import functools
-import traceback
 import os.path
+import logging
+
+logger = logging.getLogger("DANE")  # TODO change to __name__ everywhere later on
 
 
 class base_worker(ABC):
@@ -56,7 +59,7 @@ class base_worker(ABC):
     def __init__(
         self, queue, binding_key, config, depends_on=[], auto_connect=True, no_api=False
     ):
-
+        logger.info("Initialising base worker")
         self.queue = queue
 
         if not isinstance(binding_key, list):
@@ -65,6 +68,7 @@ class base_worker(ABC):
         for bk in binding_key:
             type_filter = bk.split(".")[0]
             if type_filter not in self.VALID_TYPES:
+                logger.error(f"Invalid type filter: {type_filter}")
                 raise ValueError(
                     "Invalid type filter `{}`. Valid types are: {}".format(
                         type_filter, ", ".join(self.VALID_TYPES)
@@ -98,6 +102,7 @@ class base_worker(ABC):
 
     def connect(self):
         """Connect the worker to the AMQ. Called by init if autoconnecting."""
+        logger.info("Connecting to message queue...")
         self.host = self.config.RABBITMQ.HOST
         self.port = self.config.RABBITMQ.PORT
         self.exchange = self.config.RABBITMQ.EXCHANGE
@@ -133,6 +138,7 @@ class base_worker(ABC):
 
     def run(self):
         """Start listening for tasks to be executed."""
+        logger.info("Waiting for the queue to bring in some tasks...")
         if self._connected:
             for method, props, body in self.channel.consume(
                 self.queue, inactivity_timeout=1
@@ -141,21 +147,69 @@ class base_worker(ABC):
                     break
                 if not method:
                     continue
-                self._callback(self.channel, method, props, body)
+
+                # first inspect if the task has dependencies, otherwise start processing
+                self._inspect_then_run_task(self.channel, method, props, body)
         else:
             raise ResourceConnectionError("Not connected to AMQ")
 
     def stop(self):
         """Stop listening for tasks to be executed."""
+        logger.info("No longer waiting for the queue, stopping...")
         if self._connected:
             self._is_interrupted = True
         else:
             raise ResourceConnectionError("Not connected to AMQ")
 
-    def _callback(self, ch, method, props, body):
+    def _validate_received_data(self, data: str) -> Optional[dict]:
+        logger.info("Validating received queue data")
         try:
-            body = json.loads(body)
-            if "task" not in body.keys() or "document" not in body.keys():
+            valid_data = json.loads(data)
+            if all(x in valid_data.keys() for x in ["task", "document"]):
+                return valid_data
+        except json.JSONDecodeError:
+            logger.error(f"Non-JSON data passed in the queue: {data}")
+        return None
+
+    def _check_handler_or_die(self):
+        logger.info("Checking handler availability")
+        if self.handler is None:
+            raise SystemError("No handler available to check worker dependencies")
+
+    def _check_task_dependencies(self, doc: Document) -> Tuple[bool, list]:
+        logger.info(
+            "Checking tasks dependencies (if they are met or we still have to wait)"
+        )
+        done = True  # assume assigned are done, unless find otherwise
+        dependencies = []
+        if len(self.depends_on) > 0:
+            assigned_tasks = doc.getAssignedTasks()
+            task_keys = [t["key"] for t in assigned_tasks]
+
+            for dep in self.depends_on:
+                # if the task is not yet assigned to the document, create and assign it
+                if dep not in task_keys:
+                    dependencies.append(dep)
+                    done = False
+                elif done:  # otherwise only check if all preceding deps are done
+                    if any(  # task is assigned to the document, but is it done?
+                        [
+                            t["state"] != ProcState.SUCCESS.value
+                            for t in assigned_tasks
+                            if t["key"] == dep
+                        ]
+                    ):  # a task of type dep is assigned that isnt done, wait for it
+                        done = False
+        return done, dependencies
+
+    # inspects the received queue data and if there are any task dependencies
+    # that need to be done before this worker can properly do it's processing
+    def _inspect_then_run_task(self, ch, method, props, body):
+        logger.info("Inspecting task obtained from queue data")
+        try:
+            # first validate the received queue data
+            body = self._validate_received_data(body)
+            if not body:
                 raise KeyError(
                     (
                         "Incompleted task specification, "
@@ -163,89 +217,102 @@ class base_worker(ABC):
                     )
                 )
 
+            # check if the handler is available (raises SystemError)
+            self._check_handler_or_die()
+
+            # now create Task and Document objects from the queue data
             task = Task(**body["task"])
             doc = Document(**body["document"], api=self.handler)
 
-            done = True  # assume assigned are done, unless find otherwise
-            if len(self.depends_on) > 0:
-                if self.handler is None:
-                    raise SystemError(
-                        "No handler available to check worker dependencies"
-                    )
+            # try to find task dependencies before continuing
+            dependencies_met, dependencies = self._check_task_dependencies(doc)
 
-                assigned = doc.getAssignedTasks()
-                assigned_keys = [a["key"] for a in assigned]
-
-                dependencies = []
-                for dep in self.depends_on:
-                    if dep not in assigned_keys:
-                        # this task is not yet assigned to the document
-                        # create and assign it
-                        dependencies.append(dep)
-                        done = False
-                    else:
-                        # only need to check if this is done if all preceding deps are done
-                        if done:
-                            # task is assigned to the document, but is it done?
-                            if any(
-                                [a["state"] != 200 for a in assigned if a["key"] == dep]
-                            ):
-                                # a task of type dep is assigned that isnt done
-                                # wait for it
-                                done = False
-            if not done:
-                # some dependency isnt done yet, wait for it
+            if not dependencies_met:  # some dependency isn't done yet, wait for it
+                logger.info(f"Dependencies not met, putting {task.key} task on hold")
                 response = {
-                    "state": 412,
+                    "state": ProcState.UNFINISHED_DEPENDENCY.value,
                     "message": "Unfinished dependencies",
                     "dependencies": dependencies,
                 }
-
-                self._ack_and_reply(json.dumps(response), ch, method, props)
-            else:
+                self._ack_and_reply(response, ch, method, props)
+            else:  # start the worker "callback" in a different thread
+                logger.info(
+                    f"Dependencies met, starting the work on the {task.key} task"
+                )
                 self.thread = threading.Thread(
-                    target=self._run, args=(task, doc, ch, method, props)
+                    target=self._start_processing_task,
+                    args=(task, doc, ch, method, props),
                 )
                 self.thread.setDaemon(True)
                 self.thread.start()
 
         except TypeError:
-            response = {"state": 400, "message": "Invalid format, unable to proceed"}
-
-            self._ack_and_reply(json.dumps(response), ch, method, props)
+            logger.exception("Invalid format, unable to proceed")
+            response = {
+                "state": ProcState.BAD_REQUEST.value,
+                "message": "Invalid format, unable to proceed",
+            }
+            self._ack_and_reply(response, ch, method, props)
         except Exception as e:
-            traceback.print_exc()  # TODO add a flag to disable this
-            response = {"state": 500, "message": "Unhandled error: " + str(e)}
+            logger.exception("Unhandled error")
+            response = {
+                "state": ProcState.ERROR.value,
+                "message": "Unhandled error: " + str(e),
+            }
+            self._ack_and_reply(response, ch, method, props)
 
-            self._ack_and_reply(json.dumps(response), ch, method, props)
-
-    def _run(self, task, doc, ch, method, props):
+    # Triggers the worker's callback function
+    # TODO send back a PROCESSING state BEFORE running the callback (figure out how)
+    def _start_processing_task(self, task, doc, ch, method, props):
+        logger.info(f"Started processing task {task._id} for doc {doc._id}")
         try:
+            # now let the worker do it's own work
             response = self.callback(task, doc)
+
+            # after the work, report back the resulting state
+            self._ack_with_status_msg(response, ch, method, props)
         except RefuseJobException:
-            # worker doesnt want the job yet, nack it
-            nack = functools.partial(ch.basic_nack, delivery_tag=method.delivery_tag)
-            self.connection.add_callback_threadsafe(nack)
+            logger.exception("Job refused")
+            # worker doesnt want the task yet, nack it
+            self._nack_refuse_task(ch, method)
             return
         except Exception as e:
-            traceback.print_exc()  # TODO add a flag to disable this
+            logger.exception("Unhandler error")
+            self._ack_with_status_msg(
+                {
+                    "state": ProcState.ERROR.value,
+                    "message": f"Unhandled worker error: {str(e)}",
+                },
+                ch,
+                method,
+                props,
+            )
 
-            response = {"state": 500, "message": "Unhandled worker error: " + str(e)}
+    def _nack_refuse_task(self, ch, method):
+        logger.info("Send NACK to queue: refuse task")
+        nack = functools.partial(ch.basic_nack, delivery_tag=method.delivery_tag)
+        self.connection.add_callback_threadsafe(nack)
 
-        if not isinstance(response, str):
-            response = json.dumps(response)
-
-        reply_cb = functools.partial(self._ack_and_reply, response, ch, method, props)
+    def _ack_with_status_msg(self, response: dict, ch, method, props):
+        logger.info("Send ACK + msg back to queue (async)")
+        reply_cb = functools.partial(
+            self._ack_and_reply,
+            response,
+            ch,
+            method,
+            props,
+        )
         self.connection.add_callback_threadsafe(reply_cb)
 
-    def _ack_and_reply(self, response, ch, method, props):
+    def _ack_and_reply(self, response: dict, ch, method, props):
+        logger.info("Send ACK + msg back to queue")
         ch.basic_publish(
             exchange="",
             routing_key=props.reply_to,
             properties=pika.BasicProperties(
                 correlation_id=props.correlation_id, delivery_mode=2
             ),
-            body=str(response),
+            body=json.dumps(response),  # convert to string
         )
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -260,6 +327,7 @@ class base_worker(ABC):
         :return: Dict with keys `TEMP_FOLDER` and `OUT_FOLDER`
         :rtype: dict
         """
+        logger.info("Generating TEMP_FOLDER and OUT_FOLDER")
         # expect that TEMP and OUT folder exist
         TEMP_SOURCE = self.config.PATHS.TEMP_FOLDER
         OUT_SOURCE = self.config.PATHS.OUT_FOLDER

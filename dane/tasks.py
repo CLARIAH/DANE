@@ -16,6 +16,7 @@
 import json
 from dane.errors import APIRegistrationError, MissingEndpointError
 from collections.abc import Iterable
+from dane.state import ProcState
 
 
 class Task:
@@ -46,7 +47,7 @@ class Task:
         priority=1,
         _id=None,
         api=None,
-        state=None,
+        state=None,  # TODO update this to use ProcState object
         msg=None,
         created_at=None,
         updated_at=None,
@@ -153,7 +154,7 @@ class Task:
         elif self.api is None:
             raise MissingEndpointError("No endpoint found" "to perform task")
 
-        self.api.updateTaskState(self._id, 201, "Reset")
+        self.api.updateTaskState(self._id, ProcState.CREATED.value, "Reset")
         return self
 
     def refresh(self):
@@ -183,7 +184,7 @@ class Task:
         :rtype: bool
         """
         if self.state is not None:
-            return self.state == 200
+            return self.state == ProcState.SUCCESS.value
 
         if self._id is None:
             raise APIRegistrationError("Cannot check doneness of an" "unassigned task")
