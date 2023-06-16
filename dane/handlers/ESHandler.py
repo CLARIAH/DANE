@@ -761,7 +761,6 @@ class ESHandler(BaseHandler):
             task.state
             not in [
                 ProcState.QUEUED.value,
-                # ProcState.PROCESSING.value, NOTE: not used yet
                 ProcState.SUCCESS.value,
             ]
             or force

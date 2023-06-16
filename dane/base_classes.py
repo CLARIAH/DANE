@@ -135,27 +135,6 @@ class base_worker(ABC):
         self.channel.basic_qos(prefetch_count=1)
         self._connected = True
         self._is_interrupted = False
-        # self._is_processing = False
-
-    """ TODO call this from run() later on
-    def wait_for_new_task(self):
-        m, p, b = None
-        for method, props, body in self.channel.consume(
-                self.queue, inactivity_timeout=1
-            ):
-                if self._is_interrupted or not self._connected:
-                    break
-                if not method:
-                    continue
-                # if not self._is_processing:  # TODO: will the job get lost
-
-                # first inspect if the task has dependencies, otherwise start processing
-                m = method
-                p = props
-                b = body
-                break
-        self._inspect_then_run_task(self.channel, m, p, b)
-    """
 
     def run(self):
         """Start listening for tasks to be executed."""
@@ -287,19 +266,6 @@ class base_worker(ABC):
     def _start_processing_task(self, task, doc, ch, method, props):
         logger.info(f"Started processing task {task._id} for doc {doc._id}")
         try:
-            # TODO: first set the status to PROCESSING.
-            """
-            self._ack_with_status_msg(
-                {
-                    "state": ProcState.PROCESSING.value,
-                    "message": f"Started processing task {task._id}",
-                },
-                ch,
-                method,
-                props,
-            )
-            """
-
             # now let the worker do it's own work
             response = self.callback(task, doc)
 
