@@ -74,6 +74,19 @@ cfg.PATHS = CN(new_allowed=True)
 cfg.PATHS.TEMP_FOLDER = "./TEMP"
 cfg.PATHS.OUT_FOLDER = "./OUT"
 
+# new settings block for how to deal with input
+cfg.INPUT = CN(new_allowed=True)
+cfg.INPUT.DELETE_ON_COMPLETION = False
+
+# new settings block for how to deal with output
+cfg.OUTPUT = CN(new_allowed=True)
+cfg.OUTPUT.DELETE_ON_COMPLETION = False  # delete output y/n
+cfg.OUTPUT.TRANSFER_ON_COMPLETION = False  # transfer output y/n
+# settings for transfer of output (currently S3 only)
+cfg.OUTPUT.S3_ENDPOINT_URL = None  # e.g. "http://s3-host:9000"
+cfg.OUTPUT.S3_BUCKET = None  # bucket reserved for 1 type of output
+cfg.OUTPUT.S3_FOLDER_IN_BUCKET = None  # folder/path within S3_BUCKET
+
 # Does the home dir have a config with additional param?
 # Add them. Or override defaults defined here
 if os.path.exists(os.path.join(cfg.DANE.HOME_DIR, "config.yml")):
