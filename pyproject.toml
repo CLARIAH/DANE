@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "DANE"
-version = "0.3.6"
+version = "0.3.7"
 description = "Utils for working with the Distributed Annotation and Enrichment system"
 readme = "README.md"
 authors = [
