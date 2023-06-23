@@ -327,7 +327,9 @@ class base_worker(ABC):
         :return: Dict with keys `TEMP_FOLDER` and `OUT_FOLDER`
         :rtype: dict
         """
-        logger.info("Generating TEMP_FOLDER and OUT_FOLDER")
+        logger.info(
+            f"Generating TEMP_FOLDER (auto create={create_input_dir}) and OUT_FOLDER (auto create={create_output_dir})"
+        )
         # expect that TEMP and OUT folder exist
         TEMP_SOURCE = self.config.PATHS.TEMP_FOLDER
         OUT_SOURCE = self.config.PATHS.OUT_FOLDER
