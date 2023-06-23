@@ -317,7 +317,7 @@ class base_worker(ABC):
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
-    def getDirs(self, document):
+    def getDirs(self, document, create_input_dir=True, create_output_dir=True):
         """This function returns the TEMP and OUT directories for this job
         creating them if they do not yet exist
         output should be stored in response['SHARED']
@@ -332,11 +332,6 @@ class base_worker(ABC):
         TEMP_SOURCE = self.config.PATHS.TEMP_FOLDER
         OUT_SOURCE = self.config.PATHS.OUT_FOLDER
 
-        if not os.path.exists(TEMP_SOURCE):
-            os.mkdir(TEMP_SOURCE)
-        if not os.path.exists(OUT_SOURCE):
-            os.mkdir(OUT_SOURCE)
-
         # Get a more specific path name, by chunking id into (at most)
         # three chunks of 2 characters
         chunks = os.path.join(
@@ -345,10 +340,19 @@ class base_worker(ABC):
         TEMP_DIR = os.path.join(TEMP_SOURCE, chunks, document._id)
         OUT_DIR = os.path.join(OUT_SOURCE, chunks, document._id)
 
-        if not os.path.exists(TEMP_DIR):
-            os.makedirs(TEMP_DIR)
-        if not os.path.exists(OUT_DIR):
-            os.makedirs(OUT_DIR)
+        if create_input_dir:
+            logger.info(f"Creating input dir: {TEMP_DIR}")
+            if not os.path.exists(TEMP_SOURCE):
+                os.mkdir(TEMP_SOURCE)
+            if not os.path.exists(TEMP_DIR):
+                os.makedirs(TEMP_DIR)
+
+        if create_output_dir:
+            logger.info(f"Creating output dir: {OUT_DIR}")
+            if not os.path.exists(OUT_SOURCE):
+                os.mkdir(OUT_SOURCE)
+            if not os.path.exists(OUT_DIR):
+                os.makedirs(OUT_DIR)
 
         return {"TEMP_FOLDER": TEMP_DIR, "OUT_FOLDER": OUT_DIR}
 
