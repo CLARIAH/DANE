@@ -3,9 +3,8 @@ import logging
 import ntpath
 import os
 from pathlib import Path
-import sys
 import tarfile
-from typing import List
+from typing import List, Tuple, Optional
 
 
 logger = logging.getLogger("DANE")
@@ -60,6 +59,34 @@ def tar_list_of_files(archive_path: str, file_list: List[str]) -> bool:
     return False
 
 
+def validate_s3_uri(s3_uri: str) -> bool:
+    if s3_uri[0:5] != "s3://":
+        logger.error(f"Invalid protocol in {s3_uri}")
+        return False
+    if len(s3_uri[5:].split("/")) < 2:
+        logger.error(f"No object_name specified {s3_uri}")
+        return False
+    return True
+
+
+# e.g. "s3://beng-daan-visxp/jaap-dane-test/dane-test.tar.gz"
+def parse_s3_uri(s3_uri: str) -> Tuple[str, str]:
+    logger.info(f"Parsing s3 URI {s3_uri}")
+    tmp = s3_uri[5:]
+    bucket = tmp[: tmp.find("/")]  # beng-daan-visxp
+    object_name = s3_uri[len(bucket) + 6 :]  # jaap-dane-test/dane-test.tar.gz
+    return bucket, object_name
+
+
+def download_s3_uri(s3_uri: str, output_folder: str) -> bool:
+    if not validate_s3_uri(s3_uri):
+        logger.error("Invalid S3 URI")
+        return False
+    s3_store = S3Store()
+    bucket, object_name = parse_s3_uri(s3_uri)
+    return s3_store.download_file(bucket, object_name, output_folder)
+
+
 class S3Store:
 
     """
@@ -71,7 +98,7 @@ class S3Store:
 
     """
 
-    def __init__(self, s3_endpoint_url: str, unit_testing=False):
+    def __init__(self, s3_endpoint_url: Optional[str] = None, unit_testing=False):
         self.client = boto3.client("s3", endpoint_url=s3_endpoint_url)
 
     def transfer_to_s3(
@@ -86,7 +113,7 @@ class S3Store:
                 )
                 return False
 
-            file_list = [tar_location]  # now the file_list just has the tar
+            file_list = [tar_archive_path]  # now the file_list just has the tar
 
         # now go ahead and upload whatever is in the file list
         for f in file_list:
@@ -106,9 +133,12 @@ class S3Store:
                 return False
         return True
 
-    def download_file(self, bucket: str, object_name: str) -> bool:
-        logger.info(f"Downloading {object_name}")
-        output_file = os.path.basename(object_name)
+    def download_file(self, bucket: str, object_name: str, output_folder: str) -> bool:
+        logger.info(f"Downloading {bucket}:{object_name} into {output_folder}")
+        if not os.path.exists(output_folder):
+            logger.info("Output folder does not exist, creating it...")
+            os.makedirs(output_folder)
+        output_file = os.path.join(output_folder, os.path.basename(object_name))
         try:
             with open(output_file, "wb") as f:
                 self.client.download_fileobj(bucket, object_name, f)
