@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from functools import reduce
 import json
 import logging
 from time import time
@@ -14,14 +13,17 @@ PROVENANCE_FILE = "provenance.json"
 
 @dataclass
 class Provenance:
+    # these parameters should be known before processing starts
     activity_name: str
     activity_description: str
-    start_time_unix: float
-    processing_time_ms: float
     input_data: Dict[str, Any]
-    output_data: Dict[str, Any]
-    parameters: Optional[Dict[str, Any]] = None
-    software_version: Optional[Dict[str, Any]] = None
+    start_time_unix: float
+    parameters: Dict[str, Any] = field(default_factory=Dict[str, Any])
+    software_version: Dict[str, Any] = field(default_factory=Dict[str, Any])
+
+    # empty when process just started; available when the process is done
+    output_data: Optional[Dict[str, Any]] = None
+    processing_time_ms: Optional[float] = -1
     steps: Optional[list["Provenance"]] = field(default_factory=list["Provenance"])
 
     def to_json(self):
@@ -39,31 +41,37 @@ class Provenance:
         }
 
 
-# Generates a the main Provenance object, which will embed/include the provided provenance_chain
-def generate_full_provenance_chain(
-    dane_worker_id: str,
-    start_time: float,
-    input_data: Dict[str, str],
-    provenance_chain: List[Provenance],
-    provenance_file_path: str,  # where to write provenance.json
-) -> Provenance:
-    provenance = Provenance(
+def generate_initial_provenance(
+    name: str,
+    description: str,
+    input_data: Dict[str, Any],
+    parameters: Dict[str, Any] = {},
+    software_version: Dict[str, Any] = {},
+    start_time: float = time(),
+):
+    return Provenance(
         activity_name="VisXP prep",
         activity_description=(
             "Detect shots and keyframes, "
             "extract keyframes and corresponding audio spectograms"
         ),
-        start_time_unix=start_time,
-        processing_time_ms=time() - start_time,
-        parameters=cfg.VISXP_PREP,
-        steps=provenance_chain,
-        software_version=obtain_software_versions([dane_worker_id]),
         input_data=input_data,
-        output_data=reduce(
-            lambda a, b: {**a, **b},
-            [p.output_data for p in provenance_chain],
-        ),
+        parameters=cfg.VISXP_PREP,
+        software_version=software_version,
+        start_time_unix=start_time,
     )
+
+
+# Generates a the main Provenance object, which will embed/include the provided provenance_chain
+def stop_timer_and_persist_provenance_chain(
+    provenance: Provenance,
+    output_data: Dict[str, Any],
+    provenance_chain: List[Provenance],
+    provenance_file_path: str,  # where to write provenance.json
+) -> Provenance:
+    provenance.output_data = output_data
+    provenance.processing_time_ms = time() - provenance.start_time_unix
+    provenance.steps = provenance_chain
 
     fdata = provenance.to_json()
     logger.info("Going to write the following to disk:")
