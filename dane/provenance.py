@@ -3,7 +3,6 @@ import json
 import logging
 from time import time
 from typing import Any, Dict, List, Optional
-from dane.config import cfg
 
 
 logger = logging.getLogger("DANE")
@@ -50,13 +49,10 @@ def generate_initial_provenance(
     start_time: float = time(),
 ):
     return Provenance(
-        activity_name="VisXP prep",
-        activity_description=(
-            "Detect shots and keyframes, "
-            "extract keyframes and corresponding audio spectograms"
-        ),
+        activity_name=name,
+        activity_description=description,
         input_data=input_data,
-        parameters=cfg.VISXP_PREP,
+        parameters=parameters,
         software_version=software_version,
         start_time_unix=start_time,
     )
@@ -74,8 +70,6 @@ def stop_timer_and_persist_provenance_chain(
     provenance.steps = provenance_chain
 
     fdata = provenance.to_json()
-    logger.info("Going to write the following to disk:")
-    logger.info(fdata)
     with open(provenance_file_path, "w", encoding="utf-8") as f:
         json.dump(fdata, f, ensure_ascii=False, indent=4)
         logger.info(f"Wrote provenance info to file: {provenance_file_path}")
