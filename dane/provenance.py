@@ -18,8 +18,8 @@ class Provenance:
     activity_description: str
     input_data: Dict[str, Any]
     start_time_unix: float
-    parameters: Dict[str, Any] = field(default_factory=Dict[str, Any])
-    software_version: Dict[str, Any] = field(default_factory=Dict[str, Any])
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    software_version: Dict[str, Any] = field(default_factory=dict)
 
     # empty when process just started; available when the process is done
     output_data: Optional[Dict[str, Any]] = None
