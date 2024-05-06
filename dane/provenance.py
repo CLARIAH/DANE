@@ -16,13 +16,13 @@ class Provenance:
     activity_name: str
     activity_description: str
     input_data: Dict[str, Any]
-    start_time_unix: float
+    start_time_unix: float  # in seconds
     parameters: Dict[str, Any] = field(default_factory=dict)
     software_version: Dict[str, Any] = field(default_factory=dict)
 
     # empty when process just started; available when the process is done
     output_data: Optional[Dict[str, Any]] = None
-    processing_time_ms: Optional[float] = -1
+    processing_time_ms: Optional[float] = -1  # in milliseconds
     steps: Optional[list["Provenance"]] = field(default_factory=list["Provenance"])
 
     def to_json(self):
@@ -66,7 +66,7 @@ def stop_timer_and_persist_provenance_chain(
     provenance_file_path: str,  # where to write provenance.json
 ) -> Provenance:
     provenance.output_data = output_data
-    provenance.processing_time_ms = time() - provenance.start_time_unix
+    provenance.processing_time_ms = (time() - provenance.start_time_unix) * 1000
     provenance.steps = provenance_chain
 
     fdata = provenance.to_json()
