@@ -79,7 +79,7 @@ def stop_timer_and_persist_provenance_chain(
     provenance.steps = provenance_chain
 
     # add to the provenance of the previous activities
-    complete_provenance_chain = preceding_provenance_chain.append(provenance)
+    complete_provenance_chain = preceding_provenance_chain + [provenance]
     fdata = [provenance_item.to_json() for provenance_item in complete_provenance_chain]
     with open(provenance_file_path, "w", encoding="utf-8") as f:
         json.dump(fdata, f, ensure_ascii=False, indent=4)
